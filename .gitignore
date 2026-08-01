@@ -1,0 +1,16 @@
+forum-data/*
+!forum-data/.gitkeep
+!forum-data/.htaccess
+!forum-data/index.html
+!forum-data/web.config
+!forum-data/avatars/
+forum-data/avatars/*
+!forum-data/avatars/.gitkeep
+
+TODO-optymalizacja-forum.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+admin-initial-password.txt
+.DS_Store
+Thumbs.db
