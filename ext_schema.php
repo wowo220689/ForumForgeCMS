@@ -310,20 +310,64 @@ function forum_ext_registrations_enabled(): bool
 
 function forum_ext_graphic_styles(): array
 {
-    return [
-        'classic' => 'Klasyczny jasny',
-        'ocean' => 'Oceaniczny',
-        'forest' => 'Leśny',
-        'sunrise' => 'Poranny',
-        'graphite' => 'Grafitowy',
-        'berry' => 'Jagodowy',
-        'compact' => 'Kompaktowy',
-        'neon' => 'Neonowy',
-        'paper' => 'Papierowy',
-        'metro' => 'Miejski',
-        'studio' => 'Studyjny',
-        'terminal' => 'Terminalowy',
+    return array_fill_keys(array_keys(forum_ext_graphic_style_labels('pl')), '');
+}
+
+function forum_ext_graphic_style_labels(?string $language = null): array
+{
+    $language = $language ?? forum_ext_current_language();
+    $labels = [
+        'pl' => [
+            'classic' => 'Klasyczny jasny',
+            'ocean' => 'Oceaniczny',
+            'forest' => 'Leśny',
+            'sunrise' => 'Poranny',
+            'graphite' => 'Grafitowy',
+            'berry' => 'Jagodowy',
+            'compact' => 'Kompaktowy',
+            'neon' => 'Neonowy',
+            'paper' => 'Papierowy',
+            'metro' => 'Miejski',
+            'studio' => 'Studyjny',
+            'terminal' => 'Terminalowy',
+        ],
+        'en' => [
+            'classic' => 'Classic light',
+            'ocean' => 'Ocean',
+            'forest' => 'Forest',
+            'sunrise' => 'Sunrise',
+            'graphite' => 'Graphite',
+            'berry' => 'Berry',
+            'compact' => 'Compact',
+            'neon' => 'Neon',
+            'paper' => 'Paper',
+            'metro' => 'Metro',
+            'studio' => 'Studio',
+            'terminal' => 'Terminal',
+        ],
+        'de' => [
+            'classic' => 'Klassisch hell',
+            'ocean' => 'Ozean',
+            'forest' => 'Wald',
+            'sunrise' => 'Morgenrot',
+            'graphite' => 'Graphit',
+            'berry' => 'Beere',
+            'compact' => 'Kompakt',
+            'neon' => 'Neon',
+            'paper' => 'Papier',
+            'metro' => 'Metro',
+            'studio' => 'Studio',
+            'terminal' => 'Terminal',
+        ],
     ];
+
+    return $labels[$language] ?? $labels['en'];
+}
+
+function forum_ext_graphic_style_label(string $style): string
+{
+    $labels = forum_ext_graphic_style_labels();
+    return $labels[$style] ?? $style;
 }
 
 function forum_ext_languages(): array

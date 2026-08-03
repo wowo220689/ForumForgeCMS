@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 const FORUM_TITLE = 'ForumForgeCMS';
+const FORUM_VERSION = '1.1';
 const FORUM_DB_PATH = __DIR__ . '/forum-data/forum.sqlite';
 const FORUM_ADMIN_USERNAME = 'admin';
 const FORUM_ADMIN_EMAIL = '';

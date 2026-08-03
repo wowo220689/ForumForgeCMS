@@ -19,6 +19,8 @@ The project focuses on practical deployment, readable moderation workflows, and 
 - Configurable forum name, description, logo, language, registration, and visual style
 - Multiple visual themes with different layouts and presentation styles
 - Multilingual interface support for English, Polish, and German
+- Administrator backup and restore tools for the SQLite database, avatars, and custom forum logo
+- Visible ForumForgeCMS version information in the administrator panel
 - Basic SQLite performance settings and indexes for small to medium communities
 - Protective files for `forum-data` on common Apache/IIS hosting setups
 
@@ -77,6 +79,18 @@ forum-data/
 ```
 
 This directory may contain the SQLite database, generated admin password, uploaded avatars, uploaded forum logo, and other runtime files. Runtime data is intentionally excluded from the repository and release source history.
+
+## Backup And Restore
+
+ForumForgeCMS 1.1 adds an administrator panel section for downloading and restoring forum backups. The backup package contains:
+
+```text
+forum-data/forum.sqlite
+forum-data/avatars/
+forum-data/brand/
+```
+
+This is designed for classic shared hosting environments where moving a forum between hosts should be possible without database server exports. Download the ZIP backup from the administrator panel, upload the project files on the new host, log in as an administrator, and restore the backup from the same panel section.
 
 ## Deployment Notes
 

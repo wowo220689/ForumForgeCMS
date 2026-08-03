@@ -6,6 +6,7 @@ require __DIR__ . '/ext_schema.php';
 require __DIR__ . '/ext_social.php';
 require __DIR__ . '/ext_comms.php';
 require __DIR__ . '/ext_i18n.php';
+require __DIR__ . '/ext_backup.php';
 require __DIR__ . '/ext_render.php';
 require __DIR__ . '/ext_views.php';
 
@@ -239,6 +240,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 forum_ext_close_post_report((int) ($_POST['report_id'] ?? 0), (int) $staffUser['id']);
                 forum_flash('success', 'Zgłoszenie zostało zamknięte.');
                 forum_redirect(forum_url(['view' => forum_is_admin($staffUser) ? 'admin' : 'moderation', 'section' => 'reports']));
+
+            case 'download_backup':
+                forum_require_admin_user();
+                forum_ext_download_backup();
+
+            case 'restore_backup':
+                forum_require_admin_user();
+                forum_ext_restore_backup($_FILES['forum_backup'] ?? []);
+                forum_flash('success', 'Kopia zapasowa została przywrócona. Forum korzysta teraz z danych z przesłanego archiwum.');
+                forum_redirect(forum_url(['view' => 'admin', 'section' => 'backup']));
 
             case 'update_settings':
                 forum_require_admin_user();

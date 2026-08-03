@@ -594,7 +594,7 @@ function forum_ext_render_admin(array $summary, array $categories, array $topUse
         <label for="brand-name">Nazwa forum</label><input id="brand-name" type="text" name="brand_name" value="<?php echo forum_escape($settings['brand_name']); ?>" maxlength="80" required>
         <label for="brand-tagline">Krótki opis forum</label><input id="brand-tagline" type="text" name="brand_tagline" value="<?php echo forum_escape($settings['brand_tagline']); ?>" maxlength="160" required>
         <label for="brand-logo">Własne logo forum</label><input id="brand-logo" type="file" name="brand_logo" accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif" data-forum-image="logo" data-forum-size="192" data-forum-fit="contain">
-        <label for="graphic-style">Styl graficzny forum</label><select id="graphic-style" name="graphic_style"><?php foreach (forum_ext_graphic_styles() as $styleKey => $styleLabel): ?><option value="<?php echo forum_escape($styleKey); ?>" <?php echo ($settings['graphic_style'] ?? 'classic') === $styleKey ? 'selected' : ''; ?>><?php echo forum_escape($styleLabel); ?></option><?php endforeach; ?></select>
+        <label for="graphic-style">Styl graficzny forum</label><select id="graphic-style" name="graphic_style"><?php foreach (forum_ext_graphic_styles() as $styleKey => $_styleLabel): ?><option value="<?php echo forum_escape($styleKey); ?>" <?php echo ($settings['graphic_style'] ?? 'classic') === $styleKey ? 'selected' : ''; ?>><?php echo forum_escape(forum_ext_graphic_style_label($styleKey)); ?></option><?php endforeach; ?></select>
         <label for="home-intro-title">Tytuł forum</label><input id="home-intro-title" type="text" name="home_intro_title" value="<?php echo forum_escape($settings['home_intro_title']); ?>" maxlength="120" required>
         <label for="home-intro-text">Opis forum</label><textarea id="home-intro-text" name="home_intro_text" maxlength="500" required><?php echo forum_escape($settings['home_intro_text']); ?></textarea>
         <label class="checkbox-row"><input type="checkbox" name="allow_registrations" value="1" <?php echo $settings['allow_registrations'] === '1' ? 'checked' : ''; ?>><span>Pozwól użytkownikom zakładać nowe konta</span></label>
@@ -616,6 +616,7 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
     $adminSections = [
         'settings' => 'Widok forum i rejestracja',
         'basic-settings' => 'Ustawienia podstawowe',
+        'backup' => 'Kopia zapasowa i przywracanie forum',
         'reports' => 'Zgłoszenia postów',
         'users' => 'Zarządzaj użytkownikami i moderatorami',
         'top-users' => 'Użytkownicy z największą aktywnością',
@@ -650,6 +651,7 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
     <div class="forum-admin-layout">
       <aside class="forum-admin-sidebar" aria-label="Menu panelu administratora">
         <span class="eyebrow">Panel admina</span>
+        <p class="forum-admin-note">ForumForgeCMS <?php echo forum_escape(FORUM_VERSION); ?></p>
         <nav class="forum-admin-menu">
           <?php foreach ($adminSections as $section => $label): ?>
             <?php $isActiveMenuItem = $activeSection === $section || ($activeSection === 'user' && $section === 'users'); ?>
@@ -677,8 +679,8 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
             <input id="brand-logo" type="file" name="brand_logo" accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif" data-forum-image="logo" data-forum-size="192" data-forum-fit="contain">
             <label for="graphic-style">Styl graficzny forum</label>
             <select id="graphic-style" name="graphic_style">
-              <?php foreach (forum_ext_graphic_styles() as $styleKey => $styleLabel): ?>
-                <option value="<?php echo forum_escape($styleKey); ?>" <?php echo ($settings['graphic_style'] ?? 'classic') === $styleKey ? 'selected' : ''; ?>><?php echo forum_escape($styleLabel); ?></option>
+              <?php foreach (forum_ext_graphic_styles() as $styleKey => $_styleLabel): ?>
+                <option value="<?php echo forum_escape($styleKey); ?>" <?php echo ($settings['graphic_style'] ?? 'classic') === $styleKey ? 'selected' : ''; ?>><?php echo forum_escape(forum_ext_graphic_style_label($styleKey)); ?></option>
               <?php endforeach; ?>
             </select>
             <label class="checkbox-row">
@@ -718,6 +720,40 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
             <textarea id="basic-home-intro-text" name="home_intro_text" maxlength="500" required><?php echo forum_escape($settings['home_intro_text']); ?></textarea>
             <button class="button" type="submit">Zapisz ustawienia podstawowe</button>
           </form>
+        </section>
+        <?php endif; ?>
+
+        <?php if ($activeSection === 'backup'): ?>
+        <section id="admin-backup" class="panel forum-panel">
+          <span class="eyebrow">Kopia danych</span>
+          <h2>Kopia zapasowa i przywracanie forum</h2>
+          <p class="forum-admin-note">Pobierz komplet danych forum jako ZIP: bazę SQLite, avatary użytkowników oraz własne logo forum. Taki plik możesz później wgrać na innym hostingu i przywrócić forum z panelu administratora.</p>
+
+          <div class="forum-admin-list">
+            <article class="forum-admin-card">
+              <span class="eyebrow">Pobieranie</span>
+              <h3>Pobierz kopię zapasową</h3>
+              <p class="forum-admin-note">Archiwum zawiera <code>forum-data/forum.sqlite</code>, katalog <code>forum-data/avatars</code> oraz katalog <code>forum-data/brand</code>.</p>
+              <form class="forum-form" method="post" action="<?php echo forum_url(['view' => 'admin', 'section' => 'backup']); ?>">
+                <input type="hidden" name="action" value="download_backup">
+                <input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>">
+                <button class="button" type="submit">Pobierz backup ZIP</button>
+              </form>
+            </article>
+
+            <article class="forum-admin-card forum-admin-danger-zone">
+              <span class="eyebrow">Przywracanie</span>
+              <h3>Przywróć forum z kopii</h3>
+              <p class="forum-admin-note">Przywracanie zastąpi aktualną bazę danych, avatary i logo zawartością przesłanej kopii. Po tej operacji odśwież stronę i zaloguj się danymi z przywróconej bazy.</p>
+              <form class="forum-form" method="post" action="<?php echo forum_url(['view' => 'admin', 'section' => 'backup']); ?>" enctype="multipart/form-data" onsubmit="return confirm('Przywracanie zastąpi aktualne dane forum. Kontynuować?');">
+                <input type="hidden" name="action" value="restore_backup">
+                <input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>">
+                <label for="forum-backup">Plik kopii zapasowej ZIP</label>
+                <input id="forum-backup" type="file" name="forum_backup" accept=".zip,application/zip,application/x-zip-compressed" required>
+                <button class="button-secondary forum-danger-button" type="submit">Przywróć backup</button>
+              </form>
+            </article>
+          </div>
         </section>
         <?php endif; ?>
 
