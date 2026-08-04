@@ -8,6 +8,7 @@ forum-data/avatars/*
 !forum-data/avatars/.gitkeep
 
 TODO-optymalizacja-forum.log
+ForumForgeCMS-*.zip
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

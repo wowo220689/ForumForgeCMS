@@ -4,6 +4,12 @@ ForumForgeCMS is a lightweight, self-hosted forum CMS built for classic PHP host
 
 The project focuses on practical deployment, readable moderation workflows, and a complete forum experience that can be hosted on standard web hosting packages such as Strato-style PHP hosting.
 
+## Live Demo
+
+Try ForumForgeCMS online:
+
+[https://wowo89.de/forge](https://wowo89.de/forge)
+
 ## Key Features
 
 - Standalone PHP forum CMS with SQLite storage
@@ -23,6 +29,26 @@ The project focuses on practical deployment, readable moderation workflows, and 
 - Visible ForumForgeCMS version information in the administrator panel
 - Basic SQLite performance settings and indexes for small to medium communities
 - Protective files for `forum-data` on common Apache/IIS hosting setups
+
+## Screenshots
+
+### Forum Experience
+
+![ForumForgeCMS forum homepage](screen/1.png)
+
+![ForumForgeCMS forum view](screen/2.png)
+
+![ForumForgeCMS topic view](screen/3.png)
+
+### Administrator Panel
+
+![ForumForgeCMS admin forum settings](screen/A1.png)
+
+![ForumForgeCMS admin basic settings](screen/A2.png)
+
+![ForumForgeCMS admin backup and restore](screen/A3.png)
+
+![ForumForgeCMS admin management view](screen/A4.png)
 
 ## Requirements
 
