@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 const FORUM_TITLE = 'ForumForgeCMS';
-const FORUM_VERSION = '1.1';
+const FORUM_VERSION = '1.2';
 const FORUM_DB_PATH = __DIR__ . '/forum-data/forum.sqlite';
 const FORUM_ADMIN_USERNAME = 'admin';
 const FORUM_ADMIN_EMAIL = '';
@@ -11,6 +11,7 @@ const FORUM_TOPICS_PER_PAGE = 25;
 const FORUM_POSTS_PER_PAGE = 20;
 const FORUM_MESSAGES_PER_PAGE = 25;
 const FORUM_ADMIN_USERS_PER_PAGE = 50;
+const FORUM_SEARCH_RESULTS_PER_PAGE = 10;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -709,11 +710,32 @@ function forum_is_staff(?array $user): bool
 
 function forum_role_label(?string $role): string
 {
-    return match ((string) $role) {
-        'admin' => 'administrator',
+    $language = function_exists('forum_ext_current_language') ? forum_ext_current_language() : 'pl';
+    $labels = [
+        'pl' => [
+            'admin' => 'administrator',
+            'moderator' => 'moderator',
+            'member' => 'użytkownik',
+        ],
+        'en' => [
+            'admin' => 'administrator',
+            'moderator' => 'moderator',
+            'member' => 'member',
+        ],
+        'de' => [
+            'admin' => 'Administrator',
+            'moderator' => 'Moderator',
+            'member' => 'Benutzer',
+        ],
+    ];
+
+    $roleKey = match ((string) $role) {
+        'admin' => 'admin',
         'moderator' => 'moderator',
-        default => 'użytkownik',
+        default => 'member',
     };
+
+    return $labels[$language][$roleKey] ?? $labels['en'][$roleKey] ?? $labels['pl'][$roleKey];
 }
 
 function forum_require_login(): array
@@ -1618,7 +1640,7 @@ function forum_render_header(string $title, string $description = 'Forum dyskusy
           <div class="forum-user-card">
             <?php if ($user): ?>
               <strong><?php echo forum_escape($user['username']); ?></strong>
-              <p>Zalogowany jako <?php echo forum_escape($user['role'] === 'admin' ? 'administrator' : 'użytkownik'); ?>.</p>
+              <p>Zalogowany jako <?php echo forum_escape(forum_role_label((string) ($user['role'] ?? 'member'))); ?>.</p>
               <div class="forum-button-row">
                 <a class="button-secondary" href="<?php echo forum_url(['view' => 'account']); ?>">Moje konto</a>
                 <?php if (forum_is_admin($user)): ?>
@@ -1650,7 +1672,7 @@ function forum_render_footer(): void
     </main>
     <footer class="site-footer">
       <div class="site-footer-inner">
-        &copy; 2026 Stron&#281; zbudowa&#322; <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
+        &copy; 2026 Stronę zbudował <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
       </div>
     </footer>
   </div>

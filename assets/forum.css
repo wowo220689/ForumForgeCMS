@@ -414,6 +414,30 @@ body.theme-terminal .forum-home-recent-list .forum-row + .forum-row {
   resize: vertical;
 }
 
+.forum-search-form {
+  margin-top: 18px;
+}
+
+.forum-search-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.forum-search-inline .button {
+  min-width: 140px;
+}
+
+.forum-search-excerpt {
+  margin-top: 8px !important;
+  max-width: 90ch;
+}
+
+.forum-search-results .forum-row {
+  align-items: start;
+}
+
 .forum-editor-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -982,6 +1006,14 @@ body.theme-terminal .forum-home-recent-list .forum-row + .forum-row {
 
   .forum-admin-menu {
     grid-template-columns: 1fr;
+  }
+
+  .forum-search-inline {
+    grid-template-columns: 1fr;
+  }
+
+  .forum-search-inline .button {
+    width: 100%;
   }
 }
 

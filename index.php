@@ -7,6 +7,7 @@ require __DIR__ . '/ext_social.php';
 require __DIR__ . '/ext_comms.php';
 require __DIR__ . '/ext_i18n.php';
 require __DIR__ . '/ext_backup.php';
+require __DIR__ . '/ext_search.php';
 require __DIR__ . '/ext_render.php';
 require __DIR__ . '/ext_views.php';
 
@@ -445,6 +446,18 @@ switch ($view) {
     case 'compose':
         forum_require_login();
         forum_ext_render_compose($flash, (string) ($_GET['to'] ?? ''), (string) ($_GET['subject'] ?? ''), (string) ($_GET['body'] ?? ''));
+        break;
+
+    case 'search':
+        $searchQuery = forum_ext_search_query((string) ($_GET['q'] ?? ''));
+        $searchTotal = forum_ext_count_search_results($searchQuery);
+        $searchPagination = forum_pagination($searchTotal, forum_current_page(), FORUM_SEARCH_RESULTS_PER_PAGE);
+        forum_ext_render_search(
+            $searchQuery,
+            forum_ext_search_results($searchQuery, (int) $searchPagination['page'], (int) $searchPagination['per_page']),
+            $searchPagination,
+            $flash
+        );
         break;
 
     case 'user':

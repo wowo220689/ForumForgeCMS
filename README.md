@@ -4,6 +4,8 @@ ForumForgeCMS is a lightweight, self-hosted forum CMS built for classic PHP host
 
 The project focuses on practical deployment, readable moderation workflows, and a complete forum experience that can be hosted on standard web hosting packages such as Strato-style PHP hosting.
 
+Current release: **ForumForgeCMS 1.2**
+
 ## Live Demo
 
 Try ForumForgeCMS online:
@@ -21,6 +23,7 @@ Try ForumForgeCMS online:
 - Moderator role with post reports and moderation workflow
 - Topics, replies, likes, pinned topics, locked topics, quotes, reports, and edit notes
 - Rich post editor with formatting tools and an emoticon picker
+- Built-in forum search for topics and posts with excerpts, forum names, result limits, and pagination
 - Client-side image resizing and WebP conversion for avatars and forum logos
 - Configurable forum name, description, logo, language, registration, and visual style
 - Multiple visual themes with different layouts and presentation styles
@@ -108,7 +111,7 @@ This directory may contain the SQLite database, generated admin password, upload
 
 ## Backup And Restore
 
-ForumForgeCMS 1.1 adds an administrator panel section for downloading and restoring forum backups. The backup package contains:
+ForumForgeCMS includes an administrator panel section for downloading and restoring forum backups. The backup package contains:
 
 ```text
 forum-data/forum.sqlite
@@ -117,6 +120,22 @@ forum-data/brand/
 ```
 
 This is designed for classic shared hosting environments where moving a forum between hosts should be possible without database server exports. Download the ZIP backup from the administrator panel, upload the project files on the new host, log in as an administrator, and restore the backup from the same panel section.
+
+## Search
+
+ForumForgeCMS 1.2 adds built-in forum search. The first implementation uses SQLite `LIKE` queries for a simple, hosting-friendly search layer that works without extra database services or server extensions.
+
+Search results include:
+
+- matching topic titles
+- matching post bodies
+- the forum/category name
+- author and date information
+- a short content excerpt
+- direct links to the matching topic or post
+- pagination and result limits
+
+The search system is intentionally lightweight for classic PHP hosting. SQLite FTS can be added in a future release if larger forums need more advanced indexing.
 
 ## Deployment Notes
 

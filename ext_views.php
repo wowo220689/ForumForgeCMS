@@ -232,6 +232,104 @@ function forum_ext_render_category(array $category, array $topics, array $pagina
     forum_ext_render_footer();
 }
 
+function forum_ext_render_search(string $query, array $results, array $pagination, ?array $flash): void
+{
+    $title = 'Wyszukiwarka forum';
+    $description = 'Szukaj tematów i postów opublikowanych na forum.';
+    forum_ext_render_header($title, $description);
+    forum_ext_render_flash($flash);
+    ?>
+    <section class="panel forum-panel">
+      <div class="forum-section-head">
+        <div>
+          <span class="eyebrow">Szukaj</span>
+          <h2>Wyszukiwarka forum</h2>
+          <p class="lead forum-lead">Wpisz szukaną frazę, aby znaleźć tematy i posty na forum.</p>
+        </div>
+      </div>
+
+      <form class="forum-form forum-search-form" method="get" action="<?php echo forum_url(); ?>">
+        <input type="hidden" name="view" value="search">
+        <label for="forum-search-query">Szukana fraza</label>
+        <div class="forum-search-inline">
+          <input id="forum-search-query" type="text" name="q" value="<?php echo forum_escape($query); ?>" minlength="2" maxlength="80">
+          <button class="button" type="submit">Szukaj</button>
+        </div>
+      </form>
+    </section>
+
+    <?php if ($query === ''): ?>
+      <section class="panel forum-panel">
+        <div class="callout">
+          <strong>Wpisz frazę, aby rozpocząć wyszukiwanie.</strong>
+          <p>Wyniki obejmują tytuły tematów oraz treść postów.</p>
+        </div>
+      </section>
+    <?php elseif (!forum_ext_search_query_is_valid($query)): ?>
+      <section class="panel forum-panel">
+        <div class="warning">
+          <strong>Fraza jest za krótka.</strong>
+          <p>Wpisz co najmniej 2 znaki, aby przeszukać forum.</p>
+        </div>
+      </section>
+    <?php else: ?>
+      <section class="panel forum-panel">
+        <div class="forum-section-title">
+          <div>
+            <span class="eyebrow">Wyniki</span>
+            <h2>Wyniki wyszukiwania</h2>
+            <p>Znaleziono <?php echo (int) ($pagination['total_items'] ?? 0); ?> wyników dla: <strong><?php echo forum_escape($query); ?></strong></p>
+          </div>
+        </div>
+
+        <?php if ($results === []): ?>
+          <div class="callout">
+            <strong>Brak wyników.</strong>
+            <p>Spróbuj użyć krótszej albo innej frazy.</p>
+          </div>
+        <?php else: ?>
+          <div class="forum-list forum-topic-list forum-search-results">
+            <?php foreach ($results as $result): ?>
+              <?php
+                $isPost = (string) ($result['result_type'] ?? '') === 'post';
+                $url = $isPost
+                    ? forum_url(['view' => 'topic', 'id' => (int) $result['topic_id'], 'page' => max(1, (int) ($result['post_page'] ?? 1))]) . '#post-' . (int) $result['post_id']
+                    : forum_url(['view' => 'topic', 'id' => (int) $result['topic_id']]);
+                $excerpt = $isPost
+                    ? forum_ext_search_excerpt((string) ($result['matched_text'] ?? ''), $query, 180)
+                    : 'Tytuł tematu pasuje do szukanej frazy.';
+              ?>
+              <article class="forum-row">
+                <div class="forum-row-main">
+                  <h3><a href="<?php echo forum_escape($url); ?>"><?php echo forum_escape($result['topic_title']); ?></a></h3>
+                  <p>
+                    <span class="forum-badge"><?php echo $isPost ? 'Post' : 'Temat'; ?></span>
+                    <?php echo forum_escape($result['category_name']); ?> · Autor: <strong><?php echo forum_escape($result['author_username']); ?></strong>
+                  </p>
+                  <?php if ($excerpt !== ''): ?>
+                    <p class="forum-search-excerpt"><?php echo forum_escape($excerpt); ?></p>
+                  <?php endif; ?>
+                </div>
+                <div class="forum-row-meta">
+                  <?php if ($isPost): ?>
+                    <span>post</span>
+                  <?php else: ?>
+                    <strong><?php echo (int) ($result['post_count'] ?? 0); ?></strong>
+                    <span>postów</span>
+                  <?php endif; ?>
+                  <small><?php echo forum_escape(forum_format_date((string) $result['result_at'])); ?></small>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          </div>
+          <?php forum_ext_render_pagination($pagination, ['view' => 'search', 'q' => $query]); ?>
+        <?php endif; ?>
+      </section>
+    <?php endif; ?>
+    <?php
+    forum_ext_render_footer();
+}
+
 function forum_ext_render_topic(array $topic, array $posts, array $pagination, ?array $currentUser, ?array $flash, ?array $editPost = null): void
 {
     forum_ext_render_header($topic['title'], 'Dyskusja na forum ForumForgeCMS');
@@ -854,12 +952,12 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
                 <div>
                   <label for="user-role-<?php echo (int) $selectedUser['id']; ?>">Rola</label>
                   <?php if ($isPrimaryAdmin): ?>
-                    <input id="user-role-<?php echo (int) $selectedUser['id']; ?>" type="text" value="administrator" readonly>
+                    <input id="user-role-<?php echo (int) $selectedUser['id']; ?>" type="text" value="<?php echo forum_escape(forum_role_label('admin')); ?>" readonly>
                     <input type="hidden" name="role" value="admin">
                   <?php else: ?>
                     <select id="user-role-<?php echo (int) $selectedUser['id']; ?>" name="role">
-                      <option value="member" <?php echo ($selectedUser['role'] ?? '') === 'member' ? 'selected' : ''; ?>>użytkownik</option>
-                      <option value="moderator" <?php echo ($selectedUser['role'] ?? '') === 'moderator' ? 'selected' : ''; ?>>moderator</option>
+                      <option value="member" <?php echo ($selectedUser['role'] ?? '') === 'member' ? 'selected' : ''; ?>><?php echo forum_escape(forum_role_label('member')); ?></option>
+                      <option value="moderator" <?php echo ($selectedUser['role'] ?? '') === 'moderator' ? 'selected' : ''; ?>><?php echo forum_escape(forum_role_label('moderator')); ?></option>
                     </select>
                   <?php endif; ?>
                 </div>
