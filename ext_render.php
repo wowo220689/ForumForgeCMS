@@ -100,6 +100,7 @@ function forum_ext_render_header(string $title, string $description): void
         $brandTagline = 'samodzielne forum dla Twojej społeczności';
     }
     $language = forum_ext_current_language();
+    $currentView = (string) ($_GET['view'] ?? 'home');
     ?>
 <!doctype html>
 <html lang="<?php echo forum_escape($language); ?>">
@@ -121,12 +122,14 @@ function forum_ext_render_header(string $title, string $description): void
       <div class="site-header-inner">
         <a class="brand" href="index.php"><?php if ($brandLogoUrl !== ''): ?><img class="brand-mark brand-logo" src="<?php echo forum_escape($brandLogoUrl); ?>" alt="<?php echo forum_escape($brandName); ?>" width="69" height="69"><?php else: ?><span class="brand-mark">FFC</span><?php endif; ?><span class="brand-copy"><?php echo forum_escape($brandName); ?><small><?php echo forum_escape($brandTagline); ?></small></span></a>
         <nav class="nav-links" aria-label="Główna nawigacja">
-          <a href="index.php" aria-current="page">Forum</a>
+          <a href="index.php" <?php echo $currentView === 'home' ? 'aria-current="page"' : ''; ?>>Forum</a>
+          <a href="<?php echo forum_url(['view' => 'search']); ?>" <?php echo $currentView === 'search' ? 'aria-current="page"' : ''; ?>>Szukaj</a>
         </nav>
         <details class="mobile-nav">
           <summary>Menu</summary>
           <div class="mobile-links">
-            <a href="index.php" aria-current="page">Forum</a>
+            <a href="index.php" <?php echo $currentView === 'home' ? 'aria-current="page"' : ''; ?>>Forum</a>
+            <a href="<?php echo forum_url(['view' => 'search']); ?>" <?php echo $currentView === 'search' ? 'aria-current="page"' : ''; ?>>Szukaj</a>
           </div>
         </details>
       </div>
@@ -187,7 +190,7 @@ function forum_ext_render_footer(): void
     </main>
     <footer class="site-footer">
       <div class="site-footer-inner">
-        &copy; 2026 Stron&#281; zbudowa&#322; <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
+        &copy; 2026 Stronę zbudował <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
       </div>
     </footer>
   </div>
