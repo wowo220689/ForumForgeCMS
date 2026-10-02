@@ -192,24 +192,24 @@ function forum_ext_send_message(int $senderId, string $recipientLogin, string $s
     $body = forum_trimmed_text($body, 12000);
 
     if ($recipientLogin === '') {
-        throw new RuntimeException('Wskaż odbiorcę wiadomości.');
+        throw new RuntimeException(forum_t('Wskaż odbiorcę wiadomości.'));
     }
     if ($subject === '' || strlen($subject) < 3) {
-        throw new RuntimeException('Temat wiadomości musi mieć co najmniej 3 znaki.');
+        throw new RuntimeException(forum_t('Temat wiadomości musi mieć co najmniej 3 znaki.'));
     }
     if ($body === '' || strlen($body) < 5) {
-        throw new RuntimeException('Treść wiadomości jest za krótka.');
+        throw new RuntimeException(forum_t('Treść wiadomości jest za krótka.'));
     }
 
     $stmt = forum_db()->prepare('SELECT id FROM users WHERE username = :login OR email = :login LIMIT 1');
     $stmt->execute([':login' => $recipientLogin]);
     $recipient = $stmt->fetch();
     if (!$recipient) {
-        throw new RuntimeException('Nie znaleziono użytkownika, do którego chcesz napisać.');
+        throw new RuntimeException(forum_t('Nie znaleziono użytkownika, do którego chcesz napisać.'));
     }
 
     if ((int) $recipient['id'] === $senderId) {
-        throw new RuntimeException('Nie możesz wysłać wiadomości do samego siebie.');
+        throw new RuntimeException(forum_t('Nie możesz wysłać wiadomości do samego siebie.'));
     }
 
     forum_db()->prepare(
@@ -243,7 +243,7 @@ function forum_ext_request_password_reset(string $login): void
 {
     $login = forum_trimmed_text($login, 190);
     if ($login === '') {
-        throw new RuntimeException('Podaj login lub adres e-mail.');
+        throw new RuntimeException(forum_t('Podaj login lub adres e-mail.'));
     }
 
     $stmt = forum_db()->prepare('SELECT id, username, email FROM users WHERE username = :login OR email = :login LIMIT 1');
@@ -280,15 +280,10 @@ function forum_ext_request_password_reset(string $login): void
         'token' => $token,
     ]);
 
-    $body = "Cześć {$user['username']},\n\n"
-        . "otrzymaliśmy prośbę o zmianę hasła do Twojego konta na ForumForgeCMS.\n\n"
-        . "Kliknij poniższy link, aby ustawić nowe hasło:\n"
-        . $resetUrl . "\n\n"
-        . "Link wygaśnie za " . FORUM_PASSWORD_RESET_TTL_HOURS . " godziny.\n\n"
-        . "Pozdrawiamy,\nForumForgeCMS";
+    $body = forum_t('mail.reset.body', ['username' => $user['username'], 'url' => $resetUrl, 'hours' => FORUM_PASSWORD_RESET_TTL_HOURS]);
 
-    if (!forum_ext_send_mail((string) $user['email'], 'Reset hasla do ForumForgeCMS', $body)) {
-        throw new RuntimeException('Nie udało się wysłać wiadomości resetującej hasło. Spróbuj ponownie później.');
+    if (!forum_ext_send_mail((string) $user['email'], forum_t('mail.reset.subject'), $body)) {
+        throw new RuntimeException(forum_t('Nie udało się wysłać wiadomości resetującej hasło. Spróbuj ponownie później.'));
     }
 }
 
@@ -327,12 +322,12 @@ function forum_ext_validate_reset_token(string $selector, string $token): ?array
 function forum_ext_reset_password_with_token(string $selector, string $token, string $newPassword): void
 {
     if (strlen($newPassword) < 10) {
-        throw new RuntimeException('Nowe hasło musi mieć co najmniej 10 znaków.');
+        throw new RuntimeException(forum_t('Nowe hasło musi mieć co najmniej 10 znaków.'));
     }
 
     $record = forum_ext_validate_reset_token($selector, $token);
     if (!$record) {
-        throw new RuntimeException('Link do resetu hasła jest nieprawidłowy albo wygasł.');
+        throw new RuntimeException(forum_t('Link do resetu hasła jest nieprawidłowy albo wygasł.'));
     }
 
     $pdo = forum_db();
@@ -369,7 +364,7 @@ function forum_ext_request_user_activity_purge(int $targetUserId, int $requested
     $targetUser = $stmt->fetch();
 
     if (!$targetUser) {
-        throw new RuntimeException('Nie znaleziono użytkownika, którego aktywność chcesz usunąć.');
+        throw new RuntimeException(forum_t('Nie znaleziono użytkownika, którego aktywność chcesz usunąć.'));
     }
 
     $requesterStmt = $pdo->prepare(
@@ -382,7 +377,7 @@ function forum_ext_request_user_activity_purge(int $targetUserId, int $requested
     $requestedBy = $requesterStmt->fetch();
 
     if (!$requestedBy || ($requestedBy['username'] ?? '') === '') {
-        throw new RuntimeException('Nie udało się potwierdzić konta administratora.');
+        throw new RuntimeException(forum_t('Nie udało się potwierdzić konta administratora.'));
     }
 
     $summary = forum_ext_fetch_user_activity_totals((int) $targetUser['id']);
@@ -440,23 +435,16 @@ function forum_ext_request_user_activity_purge(int $targetUserId, int $requested
         'token' => $token,
     ]);
 
-    $body = "Na ForumForgeCMS zgłoszono prośbę o usunięcie całej aktywności użytkownika.\n\n"
-        . "Użytkownik: {$targetUser['username']}\n"
-        . "E-mail konta: {$targetUser['email']}\n"
-        . "Rola: " . forum_role_label((string) ($targetUser['role'] ?? 'member')) . "\n"
-        . "Zgłoszone przez administratora: {$requestedBy['username']}\n\n"
-        . "Zakres usunięcia:\n"
-        . "- tematy: {$summary['topic_count']}\n"
-        . "- posty: {$summary['post_count']}\n"
-        . "- lajki użytkownika: {$summary['likes_given']}\n"
-        . "- wiadomości prywatne (wysłane i odebrane): {$summary['message_count']}\n\n"
-        . "Aby potwierdzić operację, otwórz poniższy link:\n"
-        . $confirmUrl . "\n\n"
-        . "Link wygaśnie za " . FORUM_ACTIVITY_PURGE_TTL_HOURS . " godzin.\n"
-        . "Jeśli to nie była świadoma decyzja administratora, po prostu zignoruj tę wiadomość.\n\n"
-        . "ForumForgeCMS";
+    $body = forum_t('mail.purge.body', [
+        'username' => $targetUser['username'], 'email' => $targetUser['email'],
+        'role' => forum_role_label((string) ($targetUser['role'] ?? 'member')),
+        'admin' => $requestedBy['username'], 'topics' => $summary['topic_count'],
+        'posts' => $summary['post_count'], 'likes' => $summary['likes_given'],
+        'messages' => $summary['message_count'], 'url' => $confirmUrl,
+        'hours' => FORUM_ACTIVITY_PURGE_TTL_HOURS,
+    ]);
 
-    if (!forum_ext_send_mail(FORUM_ACTIVITY_PURGE_CONFIRM_EMAIL, 'Potwierdzenie usunięcia aktywności użytkownika na ForumForgeCMS', $body)) {
+    if (!forum_ext_send_mail(FORUM_ACTIVITY_PURGE_CONFIRM_EMAIL, forum_t('mail.purge.subject'), $body)) {
         $pdo->prepare(
             'DELETE FROM admin_activity_purge_requests
              WHERE selector = :selector
@@ -465,7 +453,7 @@ function forum_ext_request_user_activity_purge(int $targetUserId, int $requested
             ':selector' => $selector,
         ]);
 
-        throw new RuntimeException('Nie udało się wysłać wiadomości potwierdzającej na adres administratora. Spróbuj ponownie później.');
+        throw new RuntimeException(forum_t('Nie udało się wysłać wiadomości potwierdzającej na adres administratora. Spróbuj ponownie później.'));
     }
 }
 
@@ -512,7 +500,7 @@ function forum_ext_execute_user_activity_purge(string $selector, string $token, 
 {
     $record = forum_ext_validate_user_activity_purge_request($selector, $token);
     if (!$record) {
-        throw new RuntimeException('Link potwierdzający jest nieprawidłowy albo wygasł.');
+        throw new RuntimeException(forum_t('Link potwierdzający jest nieprawidłowy albo wygasł.'));
     }
 
     $pdo = forum_db();
@@ -607,11 +595,11 @@ function forum_ext_execute_user_activity_purge(string $selector, string $token, 
 function forum_ext_delete_user_completely(int $targetUserId, int $adminUserId): array
 {
     if ($targetUserId <= 0) {
-        throw new RuntimeException('Nie wybrano użytkownika do usunięcia.');
+        throw new RuntimeException(forum_t('Nie wybrano użytkownika do usunięcia.'));
     }
 
     if ($targetUserId === $adminUserId) {
-        throw new RuntimeException('Nie możesz usunąć własnego konta administratora.');
+        throw new RuntimeException(forum_t('Nie możesz usunąć własnego konta administratora.'));
     }
 
     $pdo = forum_db();
@@ -625,11 +613,11 @@ function forum_ext_delete_user_completely(int $targetUserId, int $adminUserId): 
     $targetUser = $stmt->fetch();
 
     if (!$targetUser) {
-        throw new RuntimeException('Nie znaleziono użytkownika do usunięcia.');
+        throw new RuntimeException(forum_t('Nie znaleziono użytkownika do usunięcia.'));
     }
 
     if (strcasecmp((string) $targetUser['username'], FORUM_ADMIN_USERNAME) === 0 || (string) $targetUser['role'] === 'admin') {
-        throw new RuntimeException('Głównego konta administratora nie można usunąć z panelu.');
+        throw new RuntimeException(forum_t('Głównego konta administratora nie można usunąć z panelu.'));
     }
 
     $summary = forum_ext_fetch_user_activity_totals($targetUserId);

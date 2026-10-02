@@ -1,4 +1,6 @@
 (function () {
+  const messages = JSON.parse(document.getElementById('forum-i18n').textContent);
+  const t = (key) => messages[key] || key;
   function decodeValue(value) {
     return String(value || '').replace(/\\n/g, '\n');
   }
@@ -85,7 +87,7 @@
     }
 
     if (button.dataset.wrap) {
-      insertAround(textarea, decodeValue(button.dataset.wrap), decodeValue(button.dataset.close || ''), 'tekst');
+      insertAround(textarea, decodeValue(button.dataset.wrap), decodeValue(button.dataset.close || ''), t('tekst'));
       return;
     }
 
@@ -100,15 +102,15 @@
     }
 
     if (button.dataset.prompt === 'url') {
-      const url = window.prompt('Adres linku:');
+      const url = window.prompt(t('Adres linku:'));
       if (url) {
-        insertAround(textarea, '[url=' + url + ']', '[/url]', 'opis linku');
+        insertAround(textarea, '[url=' + url + ']', '[/url]', t('opis linku'));
       }
       return;
     }
 
     if (button.dataset.prompt === 'image') {
-      const url = window.prompt('Adres obrazka:');
+      const url = window.prompt(t('Adres obrazka:'));
       if (url) {
         insertText(textarea, '[img]' + url + '[/img]');
       }
@@ -126,7 +128,7 @@
     }
 
     if (button.dataset.action === 'clear') {
-      if (window.confirm('Wyczyścić treść pola?')) {
+      if (window.confirm(t('Wyczyścić treść pola?'))) {
         textarea.value = '';
         textarea.focus();
       }
@@ -156,11 +158,11 @@
     }
 
     if (select.dataset.style === 'color') {
-      insertAround(textarea, '[color=' + select.value + ']', '[/color]', 'tekst');
+      insertAround(textarea, '[color=' + select.value + ']', '[/color]', t('tekst'));
     }
 
     if (select.dataset.style === 'size') {
-      insertAround(textarea, '[size=' + select.value + ']', '[/size]', 'tekst');
+      insertAround(textarea, '[size=' + select.value + ']', '[/size]', t('tekst'));
     }
 
     select.value = '';

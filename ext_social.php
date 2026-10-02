@@ -134,20 +134,20 @@ function forum_ext_update_post(int $postId, array $actor, string $body, ?string 
 {
     $post = forum_ext_fetch_post($postId);
     if (!$post) {
-        throw new RuntimeException('Nie znaleziono postu do edycji.');
+        throw new RuntimeException(forum_t('Nie znaleziono postu do edycji.'));
     }
 
     if (!forum_ext_user_can_edit_post($actor, $post)) {
-        throw new RuntimeException('Nie masz uprawnień do edycji tego postu.');
+        throw new RuntimeException(forum_t('Nie masz uprawnień do edycji tego postu.'));
     }
 
     if ((int) $post['is_locked'] === 1 && !forum_is_admin($actor)) {
-        throw new RuntimeException('Ten temat jest zamknięty. Tylko administrator może jeszcze edytować post.');
+        throw new RuntimeException(forum_t('Ten temat jest zamknięty. Tylko administrator może jeszcze edytować post.'));
     }
 
     $body = forum_trimmed_text($body, 12000);
     if ($body === '' || strlen($body) < 3) {
-        throw new RuntimeException('Post po edycji jest za krótki.');
+        throw new RuntimeException(forum_t('Post po edycji jest za krótki.'));
     }
 
     $timestamp = forum_now();
@@ -169,7 +169,7 @@ function forum_ext_update_post(int $postId, array $actor, string $body, ?string 
         if ((int) $post['is_topic_starter'] === 1) {
             $newTitle = forum_trimmed_text((string) $topicTitle, 140);
             if ($newTitle === '' || strlen($newTitle) < 4) {
-                throw new RuntimeException('Tytuł tematu musi mieć co najmniej 4 znaki.');
+                throw new RuntimeException(forum_t('Tytuł tematu musi mieć co najmniej 4 znaki.'));
             }
 
             $pdo->prepare('UPDATE topics SET title = :title, updated_at = :updated_at WHERE id = :id')->execute([
@@ -191,20 +191,20 @@ function forum_ext_update_post_with_staff(int $postId, array $actor, string $bod
 {
     $post = forum_ext_fetch_post($postId);
     if (!$post) {
-        throw new RuntimeException('Nie znaleziono postu do edycji.');
+        throw new RuntimeException(forum_t('Nie znaleziono postu do edycji.'));
     }
 
     if (!forum_ext_user_can_edit_post($actor, $post)) {
-        throw new RuntimeException('Nie masz uprawnień do edycji tego postu.');
+        throw new RuntimeException(forum_t('Nie masz uprawnień do edycji tego postu.'));
     }
 
     if ((int) $post['is_locked'] === 1 && !forum_is_staff($actor)) {
-        throw new RuntimeException('Ten temat jest zamknięty. Tylko moderator albo administrator może jeszcze edytować post.');
+        throw new RuntimeException(forum_t('Ten temat jest zamknięty. Tylko moderator albo administrator może jeszcze edytować post.'));
     }
 
     $body = forum_trimmed_text($body, 12000);
     if ($body === '' || strlen($body) < 3) {
-        throw new RuntimeException('Post po edycji jest za krótki.');
+        throw new RuntimeException(forum_t('Post po edycji jest za krótki.'));
     }
 
     $timestamp = forum_now();
@@ -226,7 +226,7 @@ function forum_ext_update_post_with_staff(int $postId, array $actor, string $bod
         if ((int) $post['is_topic_starter'] === 1) {
             $newTitle = forum_trimmed_text((string) $topicTitle, 140);
             if ($newTitle === '' || strlen($newTitle) < 4) {
-                throw new RuntimeException('Tytuł tematu musi mieć co najmniej 4 znaki.');
+                throw new RuntimeException(forum_t('Tytuł tematu musi mieć co najmniej 4 znaki.'));
             }
 
             $pdo->prepare('UPDATE topics SET title = :title, updated_at = :updated_at WHERE id = :id')->execute([
@@ -248,7 +248,7 @@ function forum_ext_toggle_post_like(int $postId, int $userId): void
 {
     $post = forum_ext_fetch_post($postId);
     if (!$post) {
-        throw new RuntimeException('Nie znaleziono wskazanego postu.');
+        throw new RuntimeException(forum_t('Nie znaleziono wskazanego postu.'));
     }
 
     $pdo = forum_db();
@@ -278,7 +278,7 @@ function forum_ext_quote_text_for_post(int $postId): string
 {
     $post = forum_ext_fetch_post($postId);
     if (!$post) {
-        throw new RuntimeException('Nie znaleziono posta do zacytowania.');
+        throw new RuntimeException(forum_t('Nie znaleziono posta do zacytowania.'));
     }
 
     $author = (string) ($post['username'] ?? 'uzytkownik');
@@ -293,11 +293,11 @@ function forum_ext_report_post(int $postId, int $reporterUserId, string $reason 
 {
     $post = forum_ext_fetch_post($postId);
     if (!$post) {
-        throw new RuntimeException('Nie znaleziono posta do zgloszenia.');
+        throw new RuntimeException(forum_t('Nie znaleziono posta do zgloszenia.'));
     }
 
     if ((int) $post['user_id'] === $reporterUserId) {
-        throw new RuntimeException('Nie mozesz zglosic wlasnego posta.');
+        throw new RuntimeException(forum_t('Nie mozesz zglosic wlasnego posta.'));
     }
 
     $reason = forum_trimmed_text($reason, 500);
@@ -315,7 +315,7 @@ function forum_ext_report_post(int $postId, int $reporterUserId, string $reason 
     ]);
 
     if ($existing->fetchColumn() !== false) {
-        throw new RuntimeException('Ten post jest juz przez Ciebie zgloszony.');
+        throw new RuntimeException(forum_t('Ten post jest juz przez Ciebie zgloszony.'));
     }
 
     $pdo->prepare(
@@ -369,7 +369,7 @@ function forum_ext_close_post_report(int $reportId, int $actorUserId): void
     ]);
 
     if ($stmt->rowCount() === 0) {
-        throw new RuntimeException('Nie znaleziono aktywnego zgloszenia do zamkniecia.');
+        throw new RuntimeException(forum_t('Nie znaleziono aktywnego zgloszenia do zamkniecia.'));
     }
 }
 
@@ -497,40 +497,40 @@ function forum_ext_save_browser_webp_upload(string $tmpPath, string $destination
 {
     $imageInfo = @getimagesize($tmpPath);
     if (!is_array($imageInfo) || ($imageInfo['mime'] ?? '') !== 'image/webp') {
-        throw new RuntimeException($label . ' musi zostac wyslany jako obraz WebP.');
+        throw new RuntimeException(forum_t('{label} musi zostać wysłany jako obraz WebP.', ['label' => $label]));
     }
 
     if ((int) ($imageInfo[0] ?? 0) !== $size || (int) ($imageInfo[1] ?? 0) !== $size) {
-        throw new RuntimeException($label . ' musi miec rozmiar ' . $size . 'x' . $size . ' px.');
+        throw new RuntimeException(forum_t('{label} musi mieć rozmiar {size}x{size} px.', ['label' => $label, 'size' => $size]));
     }
 
     if (!move_uploaded_file($tmpPath, $destination)) {
-        throw new RuntimeException('Nie udalo sie zapisac obrazu na serwerze.');
+        throw new RuntimeException(forum_t('Nie udalo sie zapisac obrazu na serwerze.'));
     }
 }
 
 function forum_ext_handle_avatar_upload(int $userId, array $file): void
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        throw new RuntimeException('Wybierz plik z avatarem.');
+        throw new RuntimeException(forum_t('Wybierz plik z avatarem.'));
     }
 
     if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Nie udało się przesłać pliku z avatarem.');
+        throw new RuntimeException(forum_t('Nie udało się przesłać pliku z avatarem.'));
     }
 
     $tmpPath = (string) ($file['tmp_name'] ?? '');
     if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
-        throw new RuntimeException('Przesłany plik z avatarem jest nieprawidłowy.');
+        throw new RuntimeException(forum_t('Przesłany plik z avatarem jest nieprawidłowy.'));
     }
 
     if ((int) ($file['size'] ?? 0) > FORUM_UPLOAD_MAX_BYTES) {
-        throw new RuntimeException('Avatar może mieć maksymalnie 2 MB.');
+        throw new RuntimeException(forum_t('Avatar może mieć maksymalnie 2 MB.'));
     }
 
     $imageInfo = @getimagesize($tmpPath);
     if (!is_array($imageInfo) || empty($imageInfo['mime'])) {
-        throw new RuntimeException('Avatar musi być poprawnym obrazem.');
+        throw new RuntimeException(forum_t('Avatar musi być poprawnym obrazem.'));
     }
 
     $allowed = [
@@ -542,7 +542,7 @@ function forum_ext_handle_avatar_upload(int $userId, array $file): void
 
     $mime = (string) $imageInfo['mime'];
     if (!isset($allowed[$mime])) {
-        throw new RuntimeException('Dozwolone formaty avatara to JPG, PNG, WEBP i GIF.');
+        throw new RuntimeException(forum_t('Dozwolone formaty avatara to JPG, PNG, WEBP i GIF.'));
     }
 
     $oldStmt = forum_db()->prepare('SELECT avatar_filename FROM users WHERE id = :id LIMIT 1');
@@ -552,7 +552,7 @@ function forum_ext_handle_avatar_upload(int $userId, array $file): void
     $filename = 'u' . $userId . '_' . bin2hex(random_bytes(12)) . '.webp';
     $destination = FORUM_AVATAR_DIR . '/' . $filename;
 
-    forum_ext_save_browser_webp_upload($tmpPath, $destination, 160, 'Avatar');
+    forum_ext_save_browser_webp_upload($tmpPath, $destination, 160, forum_t('Avatar'));
 
     forum_db()->prepare(
         'UPDATE users SET avatar_filename = :avatar_filename, avatar_updated_at = :avatar_updated_at WHERE id = :id'
@@ -574,16 +574,16 @@ function forum_ext_handle_brand_logo_upload(array $file): void
     }
 
     if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Nie udalo sie przeslac pliku z logo.');
+        throw new RuntimeException(forum_t('Nie udalo sie przeslac pliku z logo.'));
     }
 
     $tmpPath = (string) ($file['tmp_name'] ?? '');
     if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
-        throw new RuntimeException('Przeslany plik z logo jest nieprawidlowy.');
+        throw new RuntimeException(forum_t('Przeslany plik z logo jest nieprawidlowy.'));
     }
 
     if ((int) ($file['size'] ?? 0) > FORUM_UPLOAD_MAX_BYTES) {
-        throw new RuntimeException('Logo moze miec maksymalnie 2 MB.');
+        throw new RuntimeException(forum_t('Logo moze miec maksymalnie 2 MB.'));
     }
 
     $oldFilename = forum_ext_setting('brand_logo_filename');
@@ -604,12 +604,12 @@ function forum_ext_output_brand_logo_image(): void
 
     $filename = forum_ext_setting('brand_logo_filename');
     if ($filename === '') {
-        throw new RuntimeException('Logo nie zostalo ustawione.');
+        throw new RuntimeException(forum_t('Logo nie zostalo ustawione.'));
     }
 
     $path = FORUM_BRAND_DIR . '/' . basename($filename);
     if (!is_file($path) || !is_readable($path)) {
-        throw new RuntimeException('Nie znaleziono pliku logo.');
+        throw new RuntimeException(forum_t('Nie znaleziono pliku logo.'));
     }
 
     header('Content-Type: image/webp');

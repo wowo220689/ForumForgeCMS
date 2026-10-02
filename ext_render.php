@@ -25,7 +25,7 @@ function forum_ext_render_avatar(array $user, string $class = 'forum-avatar'): v
     <img
       class="<?php echo forum_escape($class); ?>"
       src="<?php echo forum_escape(forum_ext_avatar_url($user)); ?>"
-      alt="<?php echo forum_escape('Avatar użytkownika ' . ($user['username'] ?? 'forum')); ?>"
+      alt="<?php echo forum_escape(forum_t('Avatar użytkownika') . ' ' . ($user['username'] ?? 'forum')); ?>"
       loading="lazy"
       width="80"
       height="80">
@@ -68,15 +68,15 @@ function forum_ext_render_pagination(array $pagination, array $baseParams = []):
     $start = max(1, $page - 2);
     $end = min($totalPages, $page + 2);
     ?>
-    <nav class="forum-pagination" aria-label="Strony">
+    <nav class="forum-pagination" aria-label="<?php echo forum_escape(forum_t('Strony')); ?>">
       <?php if ($page > 1): ?>
-        <a class="button-secondary" href="<?php echo forum_url($baseParams + ['page' => $page - 1]); ?>">Poprzednia</a>
+        <a class="button-secondary" href="<?php echo forum_url($baseParams + ['page' => $page - 1]); ?>"><?php echo forum_escape(forum_t('Poprzednia')); ?></a>
       <?php endif; ?>
       <?php for ($i = $start; $i <= $end; $i++): ?>
         <a class="button-secondary<?php echo $i === $page ? ' is-active' : ''; ?>" href="<?php echo forum_url($baseParams + ['page' => $i]); ?>" <?php echo $i === $page ? 'aria-current="page"' : ''; ?>><?php echo $i; ?></a>
       <?php endfor; ?>
       <?php if ($page < $totalPages): ?>
-        <a class="button-secondary" href="<?php echo forum_url($baseParams + ['page' => $page + 1]); ?>">Następna</a>
+        <a class="button-secondary" href="<?php echo forum_url($baseParams + ['page' => $page + 1]); ?>"><?php echo forum_escape(forum_t('Następna')); ?></a>
       <?php endif; ?>
     </nav>
     <?php
@@ -84,7 +84,6 @@ function forum_ext_render_pagination(array $pagination, array $baseParams = []):
 
 function forum_ext_render_header(string $title, string $description): void
 {
-    ob_start();
     $user = forum_ext_current_user();
     $brandName = forum_ext_setting('brand_name');
     $brandTagline = forum_ext_setting('brand_tagline');
@@ -97,7 +96,7 @@ function forum_ext_render_header(string $title, string $description): void
         $brandName = 'ForumForgeCMS';
     }
     if ($brandTagline === '') {
-        $brandTagline = 'samodzielne forum dla Twojej społeczności';
+        $brandTagline = forum_t('samodzielne forum dla Twojej społeczności');
     }
     $language = forum_ext_current_language();
     $currentView = (string) ($_GET['view'] ?? 'home');
@@ -121,15 +120,15 @@ function forum_ext_render_header(string $title, string $description): void
     <header class="site-header">
       <div class="site-header-inner">
         <a class="brand" href="index.php"><?php if ($brandLogoUrl !== ''): ?><img class="brand-mark brand-logo" src="<?php echo forum_escape($brandLogoUrl); ?>" alt="<?php echo forum_escape($brandName); ?>" width="69" height="69"><?php else: ?><span class="brand-mark">FFC</span><?php endif; ?><span class="brand-copy"><?php echo forum_escape($brandName); ?><small><?php echo forum_escape($brandTagline); ?></small></span></a>
-        <nav class="nav-links" aria-label="Główna nawigacja">
-          <a href="index.php" <?php echo $currentView === 'home' ? 'aria-current="page"' : ''; ?>>Forum</a>
-          <a href="<?php echo forum_url(['view' => 'search']); ?>" <?php echo $currentView === 'search' ? 'aria-current="page"' : ''; ?>>Szukaj</a>
+        <nav class="nav-links" aria-label="<?php echo forum_escape(forum_t('Główna nawigacja')); ?>">
+          <a href="index.php" <?php echo $currentView === 'home' ? 'aria-current="page"' : ''; ?>><?php echo forum_escape(forum_t('Forum')); ?></a>
+          <a href="<?php echo forum_url(['view' => 'search']); ?>" <?php echo $currentView === 'search' ? 'aria-current="page"' : ''; ?>><?php echo forum_escape(forum_t('Szukaj')); ?></a>
         </nav>
         <details class="mobile-nav">
-          <summary>Menu</summary>
+          <summary><?php echo forum_escape(forum_t('Menu')); ?></summary>
           <div class="mobile-links">
-            <a href="index.php" <?php echo $currentView === 'home' ? 'aria-current="page"' : ''; ?>>Forum</a>
-            <a href="<?php echo forum_url(['view' => 'search']); ?>" <?php echo $currentView === 'search' ? 'aria-current="page"' : ''; ?>>Szukaj</a>
+            <a href="index.php" <?php echo $currentView === 'home' ? 'aria-current="page"' : ''; ?>><?php echo forum_escape(forum_t('Forum')); ?></a>
+            <a href="<?php echo forum_url(['view' => 'search']); ?>" <?php echo $currentView === 'search' ? 'aria-current="page"' : ''; ?>><?php echo forum_escape(forum_t('Szukaj')); ?></a>
           </div>
         </details>
       </div>
@@ -138,7 +137,7 @@ function forum_ext_render_header(string $title, string $description): void
       <section class="hero forum-hero">
         <div class="forum-hero-grid">
           <div>
-            <span class="eyebrow">Społeczność</span>
+            <span class="eyebrow"><?php echo forum_escape(forum_t('Społeczność')); ?></span>
             <h1><?php echo forum_escape($title); ?></h1>
             <p class="lead"><?php echo forum_escape($description); ?></p>
           </div>
@@ -148,34 +147,34 @@ function forum_ext_render_header(string $title, string $description): void
                 <?php forum_ext_render_avatar($user, 'forum-avatar forum-avatar-medium'); ?>
                 <div>
                   <strong><?php echo forum_escape($user['username']); ?></strong>
-                  <p>Zalogowany jako <?php echo forum_escape(forum_role_label((string) ($user['role'] ?? 'member'))); ?>.</p>
+                  <p><?php echo forum_escape(forum_t('Zalogowany jako')); ?> <?php echo forum_escape(forum_role_label((string) ($user['role'] ?? 'member'))); ?>.</p>
                 </div>
               </div>
               <div class="forum-button-row">
-                <a class="button-secondary" href="<?php echo forum_url(['view' => 'account']); ?>">Moje konto</a>
+                <a class="button-secondary" href="<?php echo forum_url(['view' => 'account']); ?>"><?php echo forum_escape(forum_t('Moje konto')); ?></a>
                 <a class="button-secondary" href="<?php echo forum_url(['view' => 'messages']); ?>">
-                  Wiadomości<?php if ((int) ($user['unread_message_count'] ?? 0) > 0): ?> (<?php echo (int) $user['unread_message_count']; ?>)<?php endif; ?>
+                  <?php echo forum_escape(forum_t('Wiadomości')); ?><?php if ((int) ($user['unread_message_count'] ?? 0) > 0): ?> (<?php echo (int) $user['unread_message_count']; ?>)<?php endif; ?>
                 </a>
                 <?php if (forum_is_admin($user)): ?>
-                  <a class="button-secondary" href="<?php echo forum_url(['view' => 'admin']); ?>">Panel admina</a>
+                  <a class="button-secondary" href="<?php echo forum_url(['view' => 'admin']); ?>"><?php echo forum_escape(forum_t('Panel admina')); ?></a>
                 <?php elseif (forum_is_moderator($user)): ?>
-                  <a class="button-secondary" href="<?php echo forum_url(['view' => 'moderation']); ?>">Panel moderatora</a>
+                  <a class="button-secondary" href="<?php echo forum_url(['view' => 'moderation']); ?>"><?php echo forum_escape(forum_t('Panel moderatora')); ?></a>
                 <?php endif; ?>
                 <form method="post" action="<?php echo forum_url(); ?>" class="forum-inline-form">
                   <input type="hidden" name="action" value="logout">
                   <input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>">
-                  <button class="button" type="submit">Wyloguj</button>
+                  <button class="button" type="submit"><?php echo forum_escape(forum_t('Wyloguj')); ?></button>
                 </form>
               </div>
             <?php else: ?>
-              <strong>Dołącz do dyskusji</strong>
-              <p>Załóż konto, aby pisać posty, wysyłać prywatne wiadomości i budować swój profil na forum.</p>
+              <strong><?php echo forum_escape(forum_t('Dołącz do dyskusji')); ?></strong>
+              <p><?php echo forum_escape(forum_t('Załóż konto, aby pisać posty, wysyłać prywatne wiadomości i budować swój profil na forum.')); ?></p>
               <div class="forum-button-row">
                 <?php if (forum_ext_registrations_enabled()): ?>
-                  <a class="button" href="<?php echo forum_url(['view' => 'register']); ?>">Załóż konto</a>
+                  <a class="button" href="<?php echo forum_url(['view' => 'register']); ?>"><?php echo forum_escape(forum_t('Załóż konto')); ?></a>
                 <?php endif; ?>
-                <a class="button-secondary" href="<?php echo forum_url(['view' => 'login']); ?>">Zaloguj się</a>
-                <a class="button-secondary" href="<?php echo forum_url(['view' => 'forgot-password']); ?>">Reset hasła</a>
+                <a class="button-secondary" href="<?php echo forum_url(['view' => 'login']); ?>"><?php echo forum_escape(forum_t('Zaloguj się')); ?></a>
+                <a class="button-secondary" href="<?php echo forum_url(['view' => 'forgot-password']); ?>"><?php echo forum_escape(forum_t('Reset hasła')); ?></a>
               </div>
             <?php endif; ?>
           </div>
@@ -190,16 +189,21 @@ function forum_ext_render_footer(): void
     </main>
     <footer class="site-footer">
       <div class="site-footer-inner">
-        &copy; 2026 Stronę zbudował <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
+        <?php echo forum_escape(forum_t('© 2026 Stronę zbudował')); ?> <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
       </div>
     </footer>
   </div>
+  <script type="application/json" id="forum-i18n"><?php
+    $messages = [];
+    foreach (['tekst', 'Adres linku:', 'opis linku', 'Adres obrazka:', 'Wyczyścić treść pola?', 'Nie udało się odczytać obrazu.', 'Przeglądarka nie potrafi zapisać obrazu jako WebP.', 'Nie udało się przygotować obrazu do wysłania.'] as $key) {
+        $messages[$key] = forum_t($key);
+    }
+    echo json_encode($messages, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+  ?></script>
   <script src="assets/forum-media.js"></script>
   <script src="assets/forum-editor.js"></script>
 </body>
 </html>
 <?php
-    $html = ob_get_clean();
-    echo forum_ext_translate_html((string) $html);
 }
 

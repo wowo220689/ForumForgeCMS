@@ -1,4 +1,6 @@
 (function () {
+  const messages = JSON.parse(document.getElementById('forum-i18n').textContent);
+  const t = (key) => messages[key] || key;
   const inputs = document.querySelectorAll('input[type="file"][data-forum-image]');
 
   if (!inputs.length || typeof DataTransfer === 'undefined') {
@@ -16,7 +18,7 @@
       };
       image.onerror = () => {
         URL.revokeObjectURL(url);
-        reject(new Error('Nie udało się odczytać obrazu.'));
+        reject(new Error(t('Nie udało się odczytać obrazu.')));
       };
       image.src = url;
     });
@@ -25,8 +27,8 @@
   function canvasToWebp(canvas) {
     return new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error('Przeglądarka nie potrafi zapisać obrazu jako WebP.'));
+        if (!blob || blob.type !== 'image/webp') {
+          reject(new Error(t('Przeglądarka nie potrafi zapisać obrazu jako WebP.')));
           return;
         }
         resolve(blob);
@@ -113,7 +115,7 @@
           form.submit();
         }
       } catch (error) {
-        alert(error.message || 'Nie udało się przygotować obrazu do wysłania.');
+        alert(error.message || t('Nie udało się przygotować obrazu do wysłania.'));
       }
     });
   }

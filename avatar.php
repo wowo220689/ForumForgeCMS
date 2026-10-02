@@ -5,10 +5,14 @@ require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/ext_schema.php';
 require __DIR__ . '/ext_social.php';
 require __DIR__ . '/ext_comms.php';
+require_once __DIR__ . '/ext_antispam.php';
 
 $userId = (int) ($_GET['id'] ?? 0);
 
 try {
+    forum_ext_boot();
+    forum_ext_current_language();
+    forum_antispam_enforce_ip();
     forum_ext_output_avatar_image($userId);
 } catch (Throwable $e) {
     header('Content-Type: image/svg+xml; charset=UTF-8');

@@ -1,8 +1,11 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ext_i18n.php';
+require_once __DIR__ . '/ext_antispam.php';
+
 const FORUM_TITLE = 'ForumForgeCMS';
-const FORUM_VERSION = '1.2';
+const FORUM_VERSION = '1.3';
 const FORUM_DB_PATH = __DIR__ . '/forum-data/forum.sqlite';
 const FORUM_ADMIN_USERNAME = 'admin';
 const FORUM_ADMIN_EMAIL = '';
@@ -65,7 +68,7 @@ function forum_ensure_storage_directory(): void
     }
 
     if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('Nie udalo sie utworzyc katalogu danych forum.');
+        throw new RuntimeException(forum_t('Nie udalo sie utworzyc katalogu danych forum.'));
     }
 }
 
@@ -86,7 +89,7 @@ function forum_initial_admin_password(): string
 
     $password = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
     if (file_put_contents(FORUM_ADMIN_INITIAL_PASSWORD_FILE, $password . PHP_EOL, LOCK_EX) === false) {
-        throw new RuntimeException('Nie udalo sie zapisac poczatkowego hasla administratora.');
+        throw new RuntimeException(forum_t('Nie udalo sie zapisac poczatkowego hasla administratora.'));
     }
 
     return $password;
@@ -628,7 +631,7 @@ function forum_require_valid_csrf(): void
     $sessionToken = (string) ($_SESSION['forum_csrf_token'] ?? '');
 
     if ($token === '' || $sessionToken === '' || !hash_equals($sessionToken, $token)) {
-        throw new RuntimeException('Sesja formularza wygasła. Odśwież stronę i spróbuj ponownie.');
+        throw new RuntimeException(forum_t('Sesja formularza wygasła. Odśwież stronę i spróbuj ponownie.'));
     }
 }
 
@@ -667,7 +670,7 @@ function forum_rate_limit(string $key, int $maxAttempts, int $windowSeconds): vo
     ));
 
     if (count($bucket) >= $maxAttempts) {
-        throw new RuntimeException('Wykonujesz te akcje zbyt szybko. Odczekaj chwilę i spróbuj ponownie.');
+        throw new RuntimeException(forum_t('Wykonujesz te akcje zbyt szybko. Odczekaj chwilę i spróbuj ponownie.'));
     }
 
     $bucket[] = $now;
@@ -742,7 +745,7 @@ function forum_require_login(): array
 {
     $user = forum_current_user();
     if (!$user) {
-        forum_flash('error', 'Zaloguj się, aby wykonać tę akcję.');
+        forum_flash('error', forum_t('Zaloguj się, aby wykonać tę akcję.'));
         forum_redirect(forum_url(['view' => 'login']));
     }
 
@@ -753,7 +756,7 @@ function forum_require_admin_user(): array
 {
     $user = forum_require_login();
     if (!forum_is_admin($user)) {
-        forum_flash('error', 'Ta sekcja jest dostepna tylko dla administratora.');
+        forum_flash('error', forum_t('Ta sekcja jest dostepna tylko dla administratora.'));
         forum_redirect(forum_url());
     }
 
@@ -764,7 +767,7 @@ function forum_require_staff_user(): array
 {
     $user = forum_require_login();
     if (!forum_is_staff($user)) {
-        forum_flash('error', 'Ta sekcja jest dostepna tylko dla moderatora lub administratora.');
+        forum_flash('error', forum_t('Ta sekcja jest dostepna tylko dla moderatora lub administratora.'));
         forum_redirect(forum_url());
     }
 
@@ -916,31 +919,40 @@ function forum_register_user(string $username, string $email, string $password, 
     $email = forum_trimmed_text($email, 190);
 
     if (!$acceptedTerms) {
-        throw new RuntimeException('Aby założyć konto, musisz zaakceptować regulamin strony i forum.');
+        throw new RuntimeException(forum_t('Aby założyć konto, musisz zaakceptować regulamin strony i forum.'));
     }
 
     if ($username === '' || !preg_match('/^[A-Za-z0-9._-]{3,40}$/', $username)) {
-        throw new RuntimeException('Nazwa użytkownika musi mieć 3-40 znaków i może zawierać litery, cyfry, kropki, myślniki oraz podkreślenia.');
+        throw new RuntimeException(forum_t('Nazwa użytkownika musi mieć 3-40 znaków i może zawierać litery, cyfry, kropki, myślniki oraz podkreślenia.'));
     }
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        throw new RuntimeException('Podaj poprawny adres e-mail.');
+        throw new RuntimeException(forum_t('Podaj poprawny adres e-mail.'));
     }
 
+    forum_antispam_check_identity($username, $email);
+
     if (strlen($password) < 10) {
-        throw new RuntimeException('Hasło musi mieć co najmniej 10 znaków.');
+        throw new RuntimeException(forum_t('Hasło musi mieć co najmniej 10 znaków.'));
     }
 
     $stmt = forum_db()->prepare(
         'INSERT INTO users (username, email, password_hash, role, created_at)
          VALUES (:username, :email, :password_hash, "member", :created_at)'
     );
-    $stmt->execute([
-        ':username' => $username,
-        ':email' => $email,
-        ':password_hash' => password_hash($password, PASSWORD_DEFAULT),
-        ':created_at' => forum_now(),
-    ]);
+    try {
+        $stmt->execute([
+            ':username' => $username,
+            ':email' => $email,
+            ':password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            ':created_at' => forum_now(),
+        ]);
+    } catch (PDOException $e) {
+        if ($e->getCode() === '23000') {
+            throw new RuntimeException(forum_t('Taki login albo adres e-mail jest juz zajety.'), 0, $e);
+        }
+        throw $e;
+    }
 }
 
 function forum_login_user(string $login, string $password): void
@@ -953,7 +965,7 @@ function forum_login_user(string $login, string $password): void
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, (string) $user['password_hash'])) {
-        throw new RuntimeException('Nie udało się zalogować. Sprawdź login i hasło.');
+        throw new RuntimeException(forum_t('Nie udało się zalogować. Sprawdź login i hasło.'));
     }
 
     session_regenerate_id(true);
@@ -979,11 +991,11 @@ function forum_change_password(int $userId, string $currentPassword, string $new
     $hash = $stmt->fetchColumn();
 
     if (!$hash || !password_verify($currentPassword, (string) $hash)) {
-        throw new RuntimeException('Aktualne hasło jest niepoprawne.');
+        throw new RuntimeException(forum_t('Aktualne hasło jest niepoprawne.'));
     }
 
     if (strlen($newPassword) < 10) {
-        throw new RuntimeException('Nowe hasło musi mieć co najmniej 10 znaków.');
+        throw new RuntimeException(forum_t('Nowe hasło musi mieć co najmniej 10 znaków.'));
     }
 
     $update = forum_db()->prepare('UPDATE users SET password_hash = :password_hash WHERE id = :id');
@@ -1001,7 +1013,7 @@ function forum_update_user_by_admin(int $userId, string $username, string $email
     $existing = $stmt->fetch();
 
     if (!$existing) {
-        throw new RuntimeException('Nie znaleziono użytkownika do edycji.');
+        throw new RuntimeException(forum_t('Nie znaleziono użytkownika do edycji.'));
     }
 
     $isPrimaryAdmin = strcasecmp((string) $existing['username'], FORUM_ADMIN_USERNAME) === 0;
@@ -1012,18 +1024,18 @@ function forum_update_user_by_admin(int $userId, string $username, string $email
     } else {
         $username = forum_trimmed_text($username, 40);
         if ($username === '' || !preg_match('/^[A-Za-z0-9._-]{3,40}$/', $username)) {
-            throw new RuntimeException('Nazwa użytkownika musi mieć 3-40 znaków i może zawierać litery, cyfry, kropki, myślniki oraz podkreślenia.');
+            throw new RuntimeException(forum_t('Nazwa użytkownika musi mieć 3-40 znaków i może zawierać litery, cyfry, kropki, myślniki oraz podkreślenia.'));
         }
     }
 
     $email = forum_trimmed_text($email, 190);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        throw new RuntimeException('Podaj poprawny adres e-mail użytkownika.');
+        throw new RuntimeException(forum_t('Podaj poprawny adres e-mail użytkownika.'));
     }
 
     $allowedRoles = $isPrimaryAdmin ? ['admin'] : ['member', 'moderator'];
     if (!in_array($role, $allowedRoles, true)) {
-        throw new RuntimeException('Wybrana rola użytkownika jest nieprawidłowa.');
+        throw new RuntimeException(forum_t('Wybrana rola użytkownika jest nieprawidłowa.'));
     }
 
     $duplicate = $pdo->prepare(
@@ -1039,14 +1051,14 @@ function forum_update_user_by_admin(int $userId, string $username, string $email
         ':id' => $userId,
     ]);
     if ($duplicate->fetchColumn() !== false) {
-        throw new RuntimeException('Taki login albo adres e-mail jest juz zajety.');
+        throw new RuntimeException(forum_t('Taki login albo adres e-mail jest juz zajety.'));
     }
 
     $passwordHash = null;
     $newPassword = trim($newPassword);
     if ($newPassword !== '') {
         if (strlen($newPassword) < 10) {
-            throw new RuntimeException('Nowe hasło dla użytkownika musi mieć co najmniej 10 znaków.');
+            throw new RuntimeException(forum_t('Nowe hasło dla użytkownika musi mieć co najmniej 10 znaków.'));
         }
         $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
     }
@@ -1224,11 +1236,11 @@ function forum_create_topic(PDO $pdo, int $categoryId, int $userId, string $titl
     $body = forum_trimmed_text($body, 12000);
 
     if ($title === '' || strlen($title) < 4) {
-        throw new RuntimeException('Tytul tematu musi miec co najmniej 4 znaki.');
+        throw new RuntimeException(forum_t('Tytul tematu musi miec co najmniej 4 znaki.'));
     }
 
     if ($body === '' || strlen($body) < 10) {
-        throw new RuntimeException('Pierwsza wiadomość musi mieć co najmniej 10 znaków.');
+        throw new RuntimeException(forum_t('Pierwsza wiadomość musi mieć co najmniej 10 znaków.'));
     }
 
     $timestamp = forum_now();
@@ -1279,7 +1291,7 @@ function forum_create_post(int $topicId, int $userId, string $body): void
 {
     $body = forum_trimmed_text($body, 12000);
     if ($body === '' || strlen($body) < 3) {
-        throw new RuntimeException('Odpowiedz jest za kr?tka.');
+        throw new RuntimeException(forum_t('Odpowiedz jest za kr?tka.'));
     }
 
     $pdo = forum_db();
@@ -1322,7 +1334,7 @@ function forum_create_forum_section(string $name, string $description): void
     $description = forum_trimmed_text($description, 260);
 
     if ($name === '') {
-        throw new RuntimeException('Nazwa kategorii forum nie może być pusta.');
+        throw new RuntimeException(forum_t('Nazwa kategorii forum nie może być pusta.'));
     }
 
     $position = (int) forum_db()->query('SELECT COALESCE(MAX(position), 0) + 1 FROM forum_sections')->fetchColumn();
@@ -1343,7 +1355,7 @@ function forum_update_forum_section(int $sectionId, string $name, string $descri
     $description = forum_trimmed_text($description, 260);
 
     if ($name === '') {
-        throw new RuntimeException('Nazwa kategorii forum nie może być pusta.');
+        throw new RuntimeException(forum_t('Nazwa kategorii forum nie może być pusta.'));
     }
 
     $stmt = forum_db()->prepare(
@@ -1364,7 +1376,7 @@ function forum_create_category(string $name, string $description, int $sectionId
     $description = forum_trimmed_text($description, 260);
 
     if ($name === '') {
-        throw new RuntimeException('Nazwa działu nie może być pusta.');
+        throw new RuntimeException(forum_t('Nazwa działu nie może być pusta.'));
     }
 
     $sectionId = forum_normalize_forum_section_id($sectionId);
@@ -1392,7 +1404,7 @@ function forum_update_category(int $categoryId, string $name, string $descriptio
     $description = forum_trimmed_text($description, 260);
 
     if ($name === '') {
-        throw new RuntimeException('Nazwa działu nie może być pusta.');
+        throw new RuntimeException(forum_t('Nazwa działu nie może być pusta.'));
     }
 
     $pdo = forum_db();
@@ -1475,7 +1487,7 @@ function forum_delete_category(int $categoryId): void
     $topicCountStmt = forum_db()->prepare('SELECT COUNT(*) FROM topics WHERE category_id = :category_id');
     $topicCountStmt->execute([':category_id' => $categoryId]);
     if ((int) $topicCountStmt->fetchColumn() > 0) {
-        throw new RuntimeException('Najpierw przenieś lub usuń tematy z tego działu.');
+        throw new RuntimeException(forum_t('Najpierw przenieś lub usuń tematy z tego działu.'));
     }
 
     $stmt = forum_db()->prepare('DELETE FROM categories WHERE id = :id');
@@ -1527,12 +1539,12 @@ function forum_move_category(int $categoryId, string $direction): void
 function forum_toggle_topic_flag(int $topicId, string $flag): void
 {
     if (!in_array($flag, ['is_locked', 'is_pinned'], true)) {
-        throw new RuntimeException('Nieznana flaga tematu.');
+        throw new RuntimeException(forum_t('Nieznana flaga tematu.'));
     }
 
     $topic = forum_fetch_topic($topicId);
     if (!$topic) {
-        throw new RuntimeException('Nie znaleziono tematu.');
+        throw new RuntimeException(forum_t('Nie znaleziono tematu.'));
     }
 
     $newValue = ((int) $topic[$flag] === 1) ? 0 : 1;
@@ -1586,7 +1598,7 @@ function forum_recent_topics(int $limit = 8): array
 function forum_format_date(?string $value): string
 {
     if (!$value) {
-        return 'brak';
+        return forum_t('brak');
     }
 
     try {
@@ -1617,14 +1629,14 @@ function forum_render_header(string $title, string $description = 'Forum dyskusy
   <div class="site-shell">
     <header class="site-header">
       <div class="site-header-inner">
-        <a class="brand" href="index.php"><span class="brand-mark">FFC</span><span class="brand-copy">ForumForgeCMS<small>samodzielne forum dla Twojej społeczności</small></span></a>
-        <nav class="nav-links" aria-label="Gl?wna nawigacja">
-          <a href="index.php" aria-current="page">Forum</a>
+        <a class="brand" href="index.php"><span class="brand-mark">FFC</span><span class="brand-copy">ForumForgeCMS<small><?php echo forum_escape(forum_t('samodzielne forum dla Twojej społeczności')); ?></small></span></a>
+        <nav class="nav-links" aria-label="<?php echo forum_escape(forum_t('Gl?wna nawigacja')); ?>">
+          <a href="index.php" aria-current="page"><?php echo forum_escape(forum_t('Forum')); ?></a>
         </nav>
         <details class="mobile-nav">
-          <summary>Menu</summary>
+          <summary><?php echo forum_escape(forum_t('Menu')); ?></summary>
           <div class="mobile-links">
-            <a href="index.php" aria-current="page">Forum</a>
+            <a href="index.php" aria-current="page"><?php echo forum_escape(forum_t('Forum')); ?></a>
           </div>
         </details>
       </div>
@@ -1633,31 +1645,31 @@ function forum_render_header(string $title, string $description = 'Forum dyskusy
       <section class="hero forum-hero">
         <div class="forum-hero-grid">
           <div>
-            <span class="eyebrow">Społeczność</span>
+            <span class="eyebrow"><?php echo forum_escape(forum_t('Społeczność')); ?></span>
             <h1><?php echo forum_escape($title); ?></h1>
             <p class="lead"><?php echo forum_escape($description); ?></p>
           </div>
           <div class="forum-user-card">
             <?php if ($user): ?>
               <strong><?php echo forum_escape($user['username']); ?></strong>
-              <p>Zalogowany jako <?php echo forum_escape(forum_role_label((string) ($user['role'] ?? 'member'))); ?>.</p>
+              <p><?php echo forum_escape(forum_t('Zalogowany jako')); ?> <?php echo forum_escape(forum_role_label((string) ($user['role'] ?? 'member'))); ?>.</p>
               <div class="forum-button-row">
-                <a class="button-secondary" href="<?php echo forum_url(['view' => 'account']); ?>">Moje konto</a>
+                <a class="button-secondary" href="<?php echo forum_url(['view' => 'account']); ?>"><?php echo forum_escape(forum_t('Moje konto')); ?></a>
                 <?php if (forum_is_admin($user)): ?>
-                  <a class="button-secondary" href="<?php echo forum_url(['view' => 'admin']); ?>">Panel admina</a>
+                  <a class="button-secondary" href="<?php echo forum_url(['view' => 'admin']); ?>"><?php echo forum_escape(forum_t('Panel admina')); ?></a>
                 <?php endif; ?>
                 <form method="post" action="<?php echo forum_url(); ?>" class="forum-inline-form">
                   <input type="hidden" name="action" value="logout">
                   <input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>">
-                  <button class="button" type="submit">Wyloguj</button>
+                  <button class="button" type="submit"><?php echo forum_escape(forum_t('Wyloguj')); ?></button>
                 </form>
               </div>
             <?php else: ?>
-              <strong>Dolacz do dyskusji</strong>
-              <p>Zal?z konto, aby zadawac pytania, odpowiadac i sledzic rozw?j forum.</p>
+              <strong><?php echo forum_escape(forum_t('Dolacz do dyskusji')); ?></strong>
+              <p><?php echo forum_escape(forum_t('Załóż konto, aby pisać posty, wysyłać prywatne wiadomości i budować swój profil na forum.')); ?></p>
               <div class="forum-button-row">
-                <a class="button" href="<?php echo forum_url(['view' => 'register']); ?>">Zal?z konto</a>
-                <a class="button-secondary" href="<?php echo forum_url(['view' => 'login']); ?>">Zaloguj sie</a>
+                <a class="button" href="<?php echo forum_url(['view' => 'register']); ?>"><?php echo forum_escape(forum_t('Zal?z konto')); ?></a>
+                <a class="button-secondary" href="<?php echo forum_url(['view' => 'login']); ?>"><?php echo forum_escape(forum_t('Zaloguj sie')); ?></a>
               </div>
             <?php endif; ?>
           </div>
@@ -1672,7 +1684,7 @@ function forum_render_footer(): void
     </main>
     <footer class="site-footer">
       <div class="site-footer-inner">
-        &copy; 2026 Stronę zbudował <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
+        <?php echo forum_escape(forum_t('© 2026 Stronę zbudował')); ?> <a href="https://zawalka.com">Piotr Zawalka</a> (<a href="https://wowo89.de/">https://wowo89.de/</a>) - <a href="mailto:piotr@zawalka.com">piotr@zawalka.com</a>
       </div>
     </footer>
   </div>

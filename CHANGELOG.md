@@ -1,5 +1,31 @@
 # Changelog
 
+## ForumForgeCMS 1.3
+
+### Added
+
+- Dedicated administrator Spam protection section, localized in English, Polish, and German.
+- Optional arithmetic registration question, enabled by default, with session-bound one-use tokens and a ten-minute expiry.
+- Validated email domain block lists, including subdomains.
+- Exact, case-insensitive blocked usernames for new registrations.
+- Canonical IPv4/IPv6 block lists with HTTP 403 enforcement on forum, avatar, and logo endpoints.
+- Protection against blocking the primary administrator name or the administrator's current IP address.
+- Isolated SQLite regression tests and HTTP smoke tests for registration, permissions, and CSRF.
+
+### Improved
+
+- Replaced whole-page HTML string replacement with explicit UTF-8 PL/EN/DE translation dictionaries.
+- Localized labels, validation errors, confirmations, editor and image-processing prompts, and system email templates at their point of use.
+- Preserved user-authored text, usernames, and custom settings during interface translation.
+- Retained language switching for unmodified starter content and browser-language selection on first installation.
+- Corrected Polish diacritics in older error messages.
+- Detected browsers that return a non-WebP format during client-side image conversion.
+
+### Distribution
+
+- Clean-install release archive excludes screenshots, development tests, runtime data, and credentials.
+- No migration or SMTP changes introduced.
+
 ## ForumForgeCMS 1.2
 
 ForumForgeCMS 1.2 focuses on making the forum easier to use as content grows.

@@ -48,7 +48,7 @@ function forum_ext_ensure_storage_directories(): void
         }
 
         if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
-            throw new RuntimeException('Nie udało się utworzyć katalogu danych forum.');
+            throw new RuntimeException(forum_t('Nie udało się utworzyć katalogu danych forum.'));
         }
     }
 }
@@ -204,6 +204,10 @@ function forum_ext_default_settings(): array
         'home_intro_title' => 'ForumForgeCMS',
         'home_intro_text' => 'Lekka przestrzeń do rozmowy, wymiany wiedzy i budowania społeczności wokół dowolnego tematu. ForumForgeCMS daje prosty start, czytelne działy i spokojne miejsce na dyskusje, które z czasem może urosnąć razem z użytkownikami.',
         'allow_registrations' => '1',
+        'antispam_question_enabled' => '1',
+        'antispam_domains' => '',
+        'antispam_usernames' => '',
+        'antispam_ips' => '',
     ];
 }
 
@@ -277,7 +281,7 @@ function forum_ext_save_settings(array $input): void
     ];
 
     if ($data['brand_name'] === '' || $data['brand_tagline'] === '' || $data['home_intro_title'] === '' || $data['home_intro_text'] === '') {
-        throw new RuntimeException('Nazwa, krótki opis, tytuł i opis forum nie mogą być puste.');
+        throw new RuntimeException(forum_t('Nazwa, krótki opis, tytuł i opis forum nie mogą być puste.'));
     }
 
     if (!array_key_exists($data['graphic_style'], forum_ext_graphic_styles())) {
@@ -301,6 +305,7 @@ function forum_ext_save_settings(array $input): void
     }
 
     unset($GLOBALS['forum_ext_settings_cache']);
+    forum_ext_current_language();
 }
 
 function forum_ext_registrations_enabled(): bool
@@ -373,9 +378,9 @@ function forum_ext_graphic_style_label(string $style): string
 function forum_ext_languages(): array
 {
     return [
-        'pl' => 'Polski',
-        'en' => 'Angielski',
-        'de' => 'Niemiecki',
+        'pl' => forum_t('Polski'),
+        'en' => forum_t('Angielski'),
+        'de' => forum_t('Niemiecki'),
     ];
 }
 

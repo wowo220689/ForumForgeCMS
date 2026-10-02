@@ -4,7 +4,7 @@ ForumForgeCMS is a lightweight, self-hosted forum CMS built for classic PHP host
 
 The project focuses on practical deployment, readable moderation workflows, and a complete forum experience that can be hosted on standard web hosting packages such as Strato-style PHP hosting.
 
-Current release: **ForumForgeCMS 1.2**
+Current release: **ForumForgeCMS 1.3**
 
 ## Live Demo
 
@@ -28,6 +28,8 @@ Try ForumForgeCMS online:
 - Configurable forum name, description, logo, language, registration, and visual style
 - Multiple visual themes with different layouts and presentation styles
 - Multilingual interface support for English, Polish, and German
+- Explicit UTF-8 language dictionaries for interface labels, validation, editor prompts, and system emails
+- Administrator-controlled registration question, blocked email domains, usernames, and IPv4/IPv6 addresses
 - Administrator backup and restore tools for the SQLite database, avatars, and custom forum logo
 - Visible ForumForgeCMS version information in the administrator panel
 - Basic SQLite performance settings and indexes for small to medium communities
@@ -52,6 +54,28 @@ Try ForumForgeCMS online:
 ![ForumForgeCMS admin backup and restore](screen/A3.png)
 
 ![ForumForgeCMS admin management view](screen/A4.png)
+
+## What's New in 1.3
+
+Version 1.3 introduces a dedicated **Spam protection** page in the administrator panel and replaces output-wide HTML translation with explicit English, Polish, and German dictionaries. Interface translation no longer changes words inside user posts, names, or custom descriptions. Unmodified starter content continues to follow the selected forum language.
+
+### Spam Protection
+
+- A server-validated arithmetic question is enabled on registration by default. Each session-bound question expires after 10 minutes and can only be used once.
+- Email domain blocks include the specified domain and its subdomains. Use one domain per line, without `@`, URLs, or wildcards. Internationalized domains must use their ASCII/Punycode spelling.
+- Username blocks are exact and case-insensitive, using the same character rules as registration. They prevent new registrations; they do not suspend existing accounts.
+- IP blocks accept individual IPv4 or IPv6 addresses and deny access to the forum and its image endpoints with HTTP 403. CIDR ranges are not supported.
+- All lists are validated before saving, with a maximum of 1,000 entries per list. The primary administrator name and the administrator's current IP cannot be added to a block list.
+
+The question and lists are lightweight defenses, not a replacement for stronger anti-bot services or web-server controls. Existing rate limits and CSRF protection remain in place. IP checks use the server-provided `REMOTE_ADDR`, not untrusted forwarding headers. When hosting behind a reverse proxy, configure the web server to supply the real client address before using IP blocks; otherwise a shared proxy address could block multiple visitors.
+
+For accidental lockout after an IP change, use trusted hosting/database access to clear the `antispam_ips` value in the SQLite `settings` table. Backups include these settings, so review IP blocks before moving to another host.
+
+### Localization
+
+Translations are stored in `locales/en.php`, `locales/pl.php`, and `locales/de.php`, with named placeholders for dynamic values. JavaScript receives only the interface messages it needs. Browser-native file chooser labels follow the visitor's browser/OS language; user-authored content and the site owner's static terms document are not machine-translated.
+
+Release archives are prepared for clean installation and do not include a live database, administrator password, private credentials, or development tests. No database migration procedure is supplied.
 
 ## Requirements
 

@@ -5,7 +5,8 @@ require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/ext_schema.php';
 require __DIR__ . '/ext_social.php';
 require __DIR__ . '/ext_comms.php';
-require __DIR__ . '/ext_i18n.php';
+require_once __DIR__ . '/ext_i18n.php';
+require_once __DIR__ . '/ext_antispam.php';
 require __DIR__ . '/ext_backup.php';
 require __DIR__ . '/ext_search.php';
 require __DIR__ . '/ext_render.php';
@@ -14,14 +15,16 @@ require __DIR__ . '/ext_views.php';
 try {
     forum_db();
     forum_ext_boot();
+    forum_ext_current_language();
+    forum_antispam_enforce_ip();
     forum_ext_apply_language_defaults(forum_ext_current_language());
 } catch (Throwable $e) {
-    forum_ext_render_header('Forum chwilowo niedostępne', 'Nie udało się uruchomić bazy danych forum.');
+    forum_ext_render_header(forum_t('Forum chwilowo niedostępne'), forum_t('Nie udało się uruchomić bazy danych forum.'));
     ?>
     <section class="panel forum-panel">
       <div class="warning">
-        <strong>Forum nie może się teraz uruchomić.</strong>
-        <p>Sprawdź, czy hosting pozwala na zapis do katalogu <code>forum-data</code> i czy PHP ma włączoną obsługę SQLite.</p>
+        <strong><?php echo forum_escape(forum_t('Forum nie może się teraz uruchomić.')); ?></strong>
+        <p><?php echo forum_escape(forum_t('Sprawdź, czy hosting pozwala na zapis do katalogu')); ?> <code>forum-data</code> <?php echo forum_escape(forum_t('i czy PHP ma włączoną obsługę SQLite.')); ?></p>
       </div>
     </section>
     <?php
@@ -43,46 +46,47 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             case 'register':
                 forum_rate_limit('register', 3, 900);
                 if (!forum_ext_registrations_enabled()) {
-                    throw new RuntimeException('Rejestracja nowych kont jest chwilowo wyłączona.');
+                    throw new RuntimeException(forum_t('Rejestracja nowych kont jest chwilowo wyłączona.'));
                 }
+                forum_antispam_validate_answer((string) ($_POST['antispam_token'] ?? ''), (string) ($_POST['antispam_answer'] ?? ''));
                 forum_register_user((string) ($_POST['username'] ?? ''), (string) ($_POST['email'] ?? ''), (string) ($_POST['password'] ?? ''), isset($_POST['accept_terms']) && (string) $_POST['accept_terms'] === '1');
-                forum_flash('success', 'Konto zostało utworzone. Możesz się teraz zalogować.');
+                forum_flash('success', forum_t('Konto zostało utworzone. Możesz się teraz zalogować.'));
                 forum_redirect(forum_url(['view' => 'login']));
 
             case 'login':
                 forum_rate_limit('login', 8, 900);
                 forum_login_user((string) ($_POST['login'] ?? ''), (string) ($_POST['password'] ?? ''));
-                forum_flash('success', 'Zalogowano pomyślnie.');
+                forum_flash('success', forum_t('Zalogowano pomyślnie.'));
                 forum_redirect(forum_url());
 
             case 'logout':
                 forum_logout_user();
-                forum_flash('success', 'Zostałeś wylogowany.');
+                forum_flash('success', forum_t('Zostałeś wylogowany.'));
                 forum_redirect(forum_url());
 
             case 'change_password':
                 $user = forum_require_login();
                 forum_change_password((int) $user['id'], (string) ($_POST['current_password'] ?? ''), (string) ($_POST['new_password'] ?? ''));
-                forum_flash('success', 'Hasło zostało zmienione.');
+                forum_flash('success', forum_t('Hasło zostało zmienione.'));
                 forum_redirect(forum_url(['view' => 'account']));
 
             case 'upload_avatar':
                 $user = forum_require_login();
                 forum_ext_handle_avatar_upload((int) $user['id'], $_FILES['avatar'] ?? []);
-                forum_flash('success', 'Avatar został zaktualizowany.');
+                forum_flash('success', forum_t('Avatar został zaktualizowany.'));
                 forum_redirect(forum_url(['view' => 'account']));
 
             case 'remove_avatar':
                 $user = forum_require_login();
                 forum_ext_remove_avatar((int) $user['id']);
-                forum_flash('success', 'Avatar został usunięty.');
+                forum_flash('success', forum_t('Avatar został usunięty.'));
                 forum_redirect(forum_url(['view' => 'account']));
 
             case 'create_topic':
                 forum_rate_limit('create_topic_' . (int) ($_SESSION['forum_user_id'] ?? 0), 8, 600);
                 $user = forum_require_login();
                 $topicId = forum_create_topic_from_request((int) ($_POST['category_id'] ?? 0), (int) $user['id'], (string) ($_POST['title'] ?? ''), (string) ($_POST['body'] ?? ''));
-                forum_flash('success', 'Temat został utworzony.');
+                forum_flash('success', forum_t('Temat został utworzony.'));
                 forum_redirect(forum_url(['view' => 'topic', 'id' => $topicId]));
 
             case 'create_post':
@@ -91,27 +95,27 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $topicId = (int) ($_POST['topic_id'] ?? 0);
                 $topic = forum_ext_fetch_topic($topicId);
                 if (!$topic) {
-                    throw new RuntimeException('Nie znaleziono tematu.');
+                    throw new RuntimeException(forum_t('Nie znaleziono tematu.'));
                 }
                 if ((int) $topic['is_locked'] === 1 && !forum_is_staff($user)) {
-                    throw new RuntimeException('Ten temat jest zamknięty.');
+                    throw new RuntimeException(forum_t('Ten temat jest zamknięty.'));
                 }
                 forum_create_post($topicId, (int) $user['id'], (string) ($_POST['body'] ?? ''));
-                forum_flash('success', 'Odpowiedź została dodana.');
+                forum_flash('success', forum_t('Odpowiedź została dodana.'));
                 $lastPage = (int) forum_pagination(forum_count_posts_for_topic($topicId), 1, FORUM_POSTS_PER_PAGE)['total_pages'];
                 forum_redirect(forum_url(['view' => 'topic', 'id' => $topicId, 'page' => $lastPage]));
 
             case 'update_post':
                 $user = forum_require_login();
                 $topicId = forum_ext_update_post_with_staff((int) ($_POST['post_id'] ?? 0), $user, (string) ($_POST['body'] ?? ''), (string) ($_POST['topic_title'] ?? ''));
-                forum_flash('success', 'Post został zaktualizowany.');
+                forum_flash('success', forum_t('Post został zaktualizowany.'));
                 forum_redirect(forum_url(['view' => 'topic', 'id' => $topicId, 'page' => forum_current_page()]));
 
             case 'like_post':
                 $user = forum_require_login();
                 $post = forum_ext_fetch_post((int) ($_POST['post_id'] ?? 0));
                 if (!$post) {
-                    throw new RuntimeException('Nie znaleziono wskazanego postu.');
+                    throw new RuntimeException(forum_t('Nie znaleziono wskazanego postu.'));
                 }
                 forum_ext_toggle_post_like((int) $post['id'], (int) $user['id']);
                 forum_redirect(forum_url(['view' => 'topic', 'id' => (int) $post['topic_id'], 'page' => forum_current_page()]) . '#post-' . (int) $post['id']);
@@ -120,59 +124,59 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $user = forum_require_login();
                 $post = forum_ext_fetch_post((int) ($_POST['post_id'] ?? 0));
                 if (!$post) {
-                    throw new RuntimeException('Nie znaleziono wskazanego postu.');
+                    throw new RuntimeException(forum_t('Nie znaleziono wskazanego postu.'));
                 }
                 forum_ext_report_post((int) $post['id'], (int) $user['id'], (string) ($_POST['reason'] ?? ''));
-                forum_flash('success', 'Post został zgłoszony moderatorom.');
+                forum_flash('success', forum_t('Post został zgłoszony moderatorom.'));
                 forum_redirect(forum_url(['view' => 'topic', 'id' => (int) $post['topic_id'], 'page' => forum_current_page()]) . '#post-' . (int) $post['id']);
 
             case 'send_message':
                 forum_rate_limit('send_message_' . (int) ($_SESSION['forum_user_id'] ?? 0), 12, 600);
                 $user = forum_require_login();
                 $messageId = forum_ext_send_message((int) $user['id'], (string) ($_POST['recipient'] ?? ''), (string) ($_POST['subject'] ?? ''), (string) ($_POST['body'] ?? ''));
-                forum_flash('success', 'Wiadomość została wysłana.');
+                forum_flash('success', forum_t('Wiadomość została wysłana.'));
                 forum_redirect(forum_url(['view' => 'message', 'id' => $messageId]));
 
             case 'request_password_reset':
                 forum_rate_limit('password_reset', 5, 900);
                 forum_ext_request_password_reset((string) ($_POST['login'] ?? ''));
-                forum_flash('success', 'Jeśli konto istnieje, wysłaliśmy link do zmiany hasła na powiązany adres e-mail.');
+                forum_flash('success', forum_t('Jeśli konto istnieje, wysłaliśmy link do zmiany hasła na powiązany adres e-mail.'));
                 forum_redirect(forum_url(['view' => 'forgot-password']));
 
             case 'reset_password':
                 forum_rate_limit('reset_password', 5, 900);
                 forum_ext_reset_password_with_token((string) ($_POST['selector'] ?? ''), (string) ($_POST['token'] ?? ''), (string) ($_POST['new_password'] ?? ''));
-                forum_flash('success', 'Hasło zostało ustawione. Możesz się teraz zalogować.');
+                forum_flash('success', forum_t('Hasło zostało ustawione. Możesz się teraz zalogować.'));
                 forum_redirect(forum_url(['view' => 'login']));
 
             case 'create_forum_section':
                 forum_require_admin_user();
                 forum_create_forum_section((string) ($_POST['name'] ?? ''), (string) ($_POST['description'] ?? ''));
-                forum_flash('success', 'Nowa kategoria forum została dodana.');
+                forum_flash('success', forum_t('Nowa kategoria forum została dodana.'));
                 forum_redirect(forum_url(['view' => 'admin', 'section' => 'create-forum-section']));
 
             case 'update_forum_section':
                 forum_require_admin_user();
                 forum_update_forum_section((int) ($_POST['section_id'] ?? 0), (string) ($_POST['name'] ?? ''), (string) ($_POST['description'] ?? ''));
-                forum_flash('success', 'Kategoria forum została zaktualizowana.');
+                forum_flash('success', forum_t('Kategoria forum została zaktualizowana.'));
                 forum_redirect(forum_url(['view' => 'admin', 'section' => 'forum-sections']));
 
             case 'create_category':
                 forum_require_admin_user();
                 forum_create_category((string) ($_POST['name'] ?? ''), (string) ($_POST['description'] ?? ''), (int) ($_POST['section_id'] ?? 0));
-                forum_flash('success', 'Nowy dział został dodany.');
+                forum_flash('success', forum_t('Nowy dział został dodany.'));
                 forum_redirect(forum_url(['view' => 'admin', 'section' => 'create-category']));
 
             case 'update_category':
                 forum_require_admin_user();
                 forum_update_category((int) ($_POST['category_id'] ?? 0), (string) ($_POST['name'] ?? ''), (string) ($_POST['description'] ?? ''), (int) ($_POST['section_id'] ?? 0));
-                forum_flash('success', 'Dział został zaktualizowany.');
+                forum_flash('success', forum_t('Dział został zaktualizowany.'));
                 forum_redirect(forum_url(['view' => 'admin', 'section' => 'categories']));
 
             case 'move_category':
                 forum_require_admin_user();
                 forum_move_category((int) ($_POST['category_id'] ?? 0), (string) ($_POST['direction'] ?? 'down'));
-                forum_flash('success', 'Kolejność działów została zmieniona.');
+                forum_flash('success', forum_t('Kolejność działów została zmieniona.'));
                 forum_redirect(forum_url(['view' => 'admin', 'section' => 'categories']));
 
             case 'update_user':
@@ -184,7 +188,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     (string) ($_POST['role'] ?? 'member'),
                     (string) ($_POST['new_password'] ?? '')
                 );
-                forum_flash('success', 'Dane użytkownika zostały zaktualizowane.');
+                forum_flash('success', forum_t('Dane użytkownika zostały zaktualizowane.'));
                 if ($adminSection === 'user' && $adminUserId > 0) {
                     forum_redirect(forum_url(['view' => 'admin', 'section' => 'user', 'user_id' => $adminUserId]));
                 }
@@ -196,7 +200,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     (int) ($_POST['user_id'] ?? 0),
                     (int) $adminUser['id']
                 );
-                forum_flash('success', 'Wysłaliśmy wiadomość potwierdzającą na adres administratora. Dopiero po kliknięciu w link aktywność użytkownika zostanie usunięta.');
+                forum_flash('success', forum_t('Wysłaliśmy wiadomość potwierdzającą na adres administratora. Dopiero po kliknięciu w link aktywność użytkownika zostanie usunięta.'));
                 if ($adminSection === 'user' && $adminUserId > 0) {
                     forum_redirect(forum_url(['view' => 'admin', 'section' => 'user', 'user_id' => $adminUserId]));
                 }
@@ -211,7 +215,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 forum_flash(
                     'success',
                     sprintf(
-                        'Usunięto użytkownika %s oraz jego dane: %d tematów, %d postów, %d lajków i %d prywatnych wiadomości.',
+                        forum_t('Usunięto użytkownika %s oraz jego dane: %d tematów, %d postów, %d lajków i %d prywatnych wiadomości.'),
                         $result['username'],
                         $result['topic_count'],
                         $result['post_count'],
@@ -226,20 +230,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 forum_require_staff_user();
                 $topicId = (int) ($_POST['topic_id'] ?? 0);
                 forum_toggle_topic_flag($topicId, $action === 'toggle_topic_lock' ? 'is_locked' : 'is_pinned');
-                forum_flash('success', 'Status tematu został zaktualizowany.');
+                forum_flash('success', forum_t('Status tematu został zaktualizowany.'));
                 forum_redirect(forum_url(['view' => 'topic', 'id' => $topicId]));
 
             case 'delete_topic':
                 forum_require_staff_user();
                 $topicId = (int) ($_POST['topic_id'] ?? 0);
                 forum_delete_topic($topicId);
-                forum_flash('success', 'Temat został usunięty.');
+                forum_flash('success', forum_t('Temat został usunięty.'));
                 forum_redirect(forum_url());
 
             case 'close_post_report':
                 $staffUser = forum_require_staff_user();
                 forum_ext_close_post_report((int) ($_POST['report_id'] ?? 0), (int) $staffUser['id']);
-                forum_flash('success', 'Zgłoszenie zostało zamknięte.');
+                forum_flash('success', forum_t('Zgłoszenie zostało zamknięte.'));
                 forum_redirect(forum_url(['view' => forum_is_admin($staffUser) ? 'admin' : 'moderation', 'section' => 'reports']));
 
             case 'download_backup':
@@ -249,15 +253,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             case 'restore_backup':
                 forum_require_admin_user();
                 forum_ext_restore_backup($_FILES['forum_backup'] ?? []);
-                forum_flash('success', 'Kopia zapasowa została przywrócona. Forum korzysta teraz z danych z przesłanego archiwum.');
+                forum_flash('success', forum_t('Kopia zapasowa została przywrócona. Forum korzysta teraz z danych z przesłanego archiwum.'));
                 forum_redirect(forum_url(['view' => 'admin', 'section' => 'backup']));
+
+            case 'update_antispam':
+                forum_require_admin_user();
+                forum_antispam_save($_POST);
+                forum_flash('success', forum_t('Ustawienia ochrony przed spamem zostały zapisane.'));
+                forum_redirect(forum_url(['view' => 'admin', 'section' => 'antispam']));
 
             case 'update_settings':
                 forum_require_admin_user();
                 forum_ext_save_settings($_POST);
                 forum_ext_apply_language_defaults((string) ($_POST['forum_language'] ?? 'en'));
                 forum_ext_handle_brand_logo_upload($_FILES['brand_logo'] ?? []);
-                forum_flash('success', 'Ustawienia forum zostały zapisane.');
+                forum_flash('success', forum_t('Ustawienia forum zostały zapisane.'));
                 $returnSection = (string) ($_POST['return_section'] ?? 'settings');
                 if (!in_array($returnSection, ['settings', 'basic-settings'], true)) {
                     $returnSection = 'settings';
@@ -285,9 +295,9 @@ switch ($view) {
     case 'category':
         $category = forum_fetch_category((int) ($_GET['id'] ?? 0));
         if (!$category) {
-            forum_ext_render_header('Nie znaleziono działu', 'Wybrany dział forum nie istnieje.');
+            forum_ext_render_header(forum_t('Nie znaleziono działu'), forum_t('Wybrany dział forum nie istnieje.'));
             forum_ext_render_flash($flash);
-            echo '<section class="panel forum-panel"><p>Nie udało się znaleźć wskazanego działu.</p></section>';
+            echo '<section class="panel forum-panel"><p>' . forum_escape(forum_t('Nie udało się znaleźć wskazanego działu.')) . '</p></section>';
             forum_ext_render_footer();
             break;
         }
@@ -304,9 +314,9 @@ switch ($view) {
     case 'topic':
         $topic = forum_ext_fetch_topic((int) ($_GET['id'] ?? 0));
         if (!$topic) {
-            forum_ext_render_header('Nie znaleziono tematu', 'Wybrany temat forum nie istnieje.');
+            forum_ext_render_header(forum_t('Nie znaleziono tematu'), forum_t('Wybrany temat forum nie istnieje.'));
             forum_ext_render_flash($flash);
-            echo '<section class="panel forum-panel"><p>Nie udało się znaleźć wskazanego tematu.</p></section>';
+            echo '<section class="panel forum-panel"><p>' . forum_escape(forum_t('Nie udało się znaleźć wskazanego tematu.')) . '</p></section>';
             forum_ext_render_footer();
             break;
         }
@@ -337,12 +347,12 @@ switch ($view) {
         if ($currentUser && ((int) $topic['is_locked'] === 0 || forum_is_staff($currentUser))) {
             ?>
             <section class="panel forum-panel">
-              <span class="eyebrow">Odpowiedź</span>
-              <h2>Dodaj odpowiedź</h2>
+              <span class="eyebrow"><?php echo forum_escape(forum_t('Odpowiedź')); ?></span>
+              <h2><?php echo forum_escape(forum_t('Dodaj odpowiedź')); ?></h2>
               <form class="forum-form" method="post" action="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) $postPagination['page']]); ?>">
                 <input type="hidden" name="action" value="create_post"><input type="hidden" name="topic_id" value="<?php echo (int) $topic['id']; ?>"><input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>">
-                <label for="reply-body">Twoja wiadomość</label><?php forum_ext_render_editor_toolbar('reply-body'); ?><textarea id="reply-body" name="body" minlength="3" maxlength="12000" required><?php echo forum_escape($quoteText); ?></textarea>
-                <button class="button" type="submit">Opublikuj odpowiedź</button>
+                <label for="reply-body"><?php echo forum_escape(forum_t('Twoja wiadomość')); ?></label><?php forum_ext_render_editor_toolbar('reply-body'); ?><textarea id="reply-body" name="body" minlength="3" maxlength="12000" required><?php echo forum_escape($quoteText); ?></textarea>
+                <button class="button" type="submit"><?php echo forum_escape(forum_t('Opublikuj odpowiedź')); ?></button>
               </form>
             </section>
             <?php
@@ -350,12 +360,12 @@ switch ($view) {
             ?>
             <section class="panel forum-panel">
               <div class="callout">
-                <strong>Chcesz odpowiedzieć?</strong>
+                <strong><?php echo forum_escape(forum_t('Chcesz odpowiedzieć?')); ?></strong>
                 <p>
                   <?php if (forum_ext_registrations_enabled()): ?>
-                    Najpierw <a href="<?php echo forum_url(['view' => 'register']); ?>">załóż konto</a> albo <a href="<?php echo forum_url(['view' => 'login']); ?>">zaloguj się</a>.
+                    <?php echo forum_escape(forum_t('Najpierw')); ?> <a href="<?php echo forum_url(['view' => 'register']); ?>"><?php echo forum_escape(forum_t('załóż konto')); ?></a> <?php echo forum_escape(forum_t('albo')); ?> <a href="<?php echo forum_url(['view' => 'login']); ?>"><?php echo forum_escape(forum_t('zaloguj się')); ?></a>.
                   <?php else: ?>
-                    Najpierw <a href="<?php echo forum_url(['view' => 'login']); ?>">zaloguj się</a>.
+                    <?php echo forum_escape(forum_t('Najpierw')); ?> <a href="<?php echo forum_url(['view' => 'login']); ?>"><?php echo forum_escape(forum_t('zaloguj się')); ?></a>.
                   <?php endif; ?>
                 </p>
               </div>
@@ -365,8 +375,8 @@ switch ($view) {
             ?>
             <section class="panel forum-panel">
               <div class="warning">
-                <strong>Ten temat jest zamknięty.</strong>
-                <p>Nowe odpowiedzi są obecnie wyłączone.</p>
+                <strong><?php echo forum_escape(forum_t('Ten temat jest zamknięty.')); ?></strong>
+                <p><?php echo forum_escape(forum_t('Nowe odpowiedzi są obecnie wyłączone.')); ?></p>
               </div>
             </section>
             <?php
@@ -396,7 +406,7 @@ switch ($view) {
             forum_flash(
                 'success',
                 sprintf(
-                    'Usunięto aktywność użytkownika %s: %d tematów, %d postów, %d lajków i %d prywatnych wiadomości.',
+                    forum_t('Usunięto aktywność użytkownika %s: %d tematów, %d postów, %d lajków i %d prywatnych wiadomości.'),
                     $result['username'],
                     $result['topic_count'],
                     $result['post_count'],
@@ -437,7 +447,7 @@ switch ($view) {
         forum_ext_mark_message_read($messageId, (int) $user['id']);
         $message = forum_ext_fetch_message($messageId, (int) $user['id']);
         if (!$message) {
-            forum_flash('error', 'Nie znaleziono wiadomości.');
+            forum_flash('error', forum_t('Nie znaleziono wiadomości.'));
             forum_redirect(forum_url(['view' => 'messages']));
         }
         forum_ext_render_message($message, $flash);
@@ -463,9 +473,9 @@ switch ($view) {
     case 'user':
         $profile = forum_ext_fetch_user_profile((int) ($_GET['id'] ?? 0));
         if (!$profile) {
-            forum_ext_render_header('Nie znaleziono użytkownika', 'Wybrany profil nie istnieje.');
+            forum_ext_render_header(forum_t('Nie znaleziono użytkownika'), forum_t('Wybrany profil nie istnieje.'));
             forum_ext_render_flash($flash);
-            echo '<section class="panel forum-panel"><p>Nie udało się znaleźć wskazanego użytkownika.</p></section>';
+            echo '<section class="panel forum-panel"><p>' . forum_escape(forum_t('Nie udało się znaleźć wskazanego użytkownika.')) . '</p></section>';
             forum_ext_render_footer();
             break;
         }

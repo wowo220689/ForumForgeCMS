@@ -61,7 +61,7 @@ function forum_ext_create_zip_archive(array $files, string $targetFile): void
 {
     $handle = fopen($targetFile, 'wb');
     if (!is_resource($handle)) {
-        throw new RuntimeException('Nie udalo sie przygotowac pliku ZIP kopii zapasowej.');
+        throw new RuntimeException(forum_t('Nie udalo sie przygotowac pliku ZIP kopii zapasowej.'));
     }
 
     $centralDirectory = '';
@@ -125,7 +125,7 @@ function forum_ext_download_backup(): void
 
     $tempFile = tempnam(sys_get_temp_dir(), 'ffc-backup-');
     if ($tempFile === false) {
-        throw new RuntimeException('Nie udalo sie utworzyc pliku tymczasowego kopii zapasowej.');
+        throw new RuntimeException(forum_t('Nie udalo sie utworzyc pliku tymczasowego kopii zapasowej.'));
     }
 
     $files = [];
@@ -166,7 +166,7 @@ function forum_ext_clean_directory_contents(string $directory): void
 {
     if (!is_dir($directory)) {
         if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
-            throw new RuntimeException('Nie udalo sie przygotowac katalogu danych do przywracania.');
+            throw new RuntimeException(forum_t('Nie udalo sie przygotowac katalogu danych do przywracania.'));
         }
         return;
     }
@@ -195,11 +195,11 @@ function forum_ext_restore_file_contents(string $archiveName, string $content): 
     $targetPath = FORUM_DATA_DIR . '/' . $relative;
     $directory = dirname($targetPath);
     if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('Nie udalo sie utworzyc katalogu docelowego podczas przywracania.');
+        throw new RuntimeException(forum_t('Nie udalo sie utworzyc katalogu docelowego podczas przywracania.'));
     }
 
     if (file_put_contents($targetPath, $content, LOCK_EX) === false) {
-        throw new RuntimeException('Nie udalo sie zapisac pliku podczas przywracania.');
+        throw new RuntimeException(forum_t('Nie udalo sie zapisac pliku podczas przywracania.'));
     }
 }
 
@@ -207,7 +207,7 @@ function forum_ext_restore_backup_with_zip_archive(string $tmpName): void
 {
     $zip = new ZipArchive();
     if ($zip->open($tmpName) !== true) {
-        throw new RuntimeException('Plik kopii zapasowej nie jest poprawnym archiwum ZIP.');
+        throw new RuntimeException(forum_t('Plik kopii zapasowej nie jest poprawnym archiwum ZIP.'));
     }
 
     $hasDatabase = false;
@@ -218,7 +218,7 @@ function forum_ext_restore_backup_with_zip_archive(string $tmpName): void
         }
         if (!forum_ext_backup_allowed_path($name) && $name !== 'backup-info.txt') {
             $zip->close();
-            throw new RuntimeException('Kopia zawiera niedozwolone pliki. Przywracanie zostalo przerwane.');
+            throw new RuntimeException(forum_t('Kopia zawiera niedozwolone pliki. Przywracanie zostalo przerwane.'));
         }
         if ($name === 'forum-data/forum.sqlite') {
             $hasDatabase = true;
@@ -227,7 +227,7 @@ function forum_ext_restore_backup_with_zip_archive(string $tmpName): void
 
     if (!$hasDatabase) {
         $zip->close();
-        throw new RuntimeException('Kopia zapasowa nie zawiera pliku forum-data/forum.sqlite.');
+        throw new RuntimeException(forum_t('Kopia zapasowa nie zawiera pliku forum-data/forum.sqlite.'));
     }
 
     forum_ext_clean_directory_contents(FORUM_AVATAR_DIR);
@@ -247,7 +247,7 @@ function forum_ext_restore_backup_with_zip_archive(string $tmpName): void
 function forum_ext_restore_backup_with_phar(string $tmpName): void
 {
     if (!class_exists('PharData')) {
-        throw new RuntimeException('Na serwerze brakuje obslugi archiwow ZIP potrzebnej do przywracania kopii.');
+        throw new RuntimeException(forum_t('Na serwerze brakuje obslugi archiwow ZIP potrzebnej do przywracania kopii.'));
     }
 
     $phar = new PharData($tmpName);
@@ -266,7 +266,7 @@ function forum_ext_restore_backup_with_phar(string $tmpName): void
             $name = substr($name, strlen($pharPrefix));
         }
         if (!forum_ext_backup_allowed_path($name) && $name !== 'backup-info.txt') {
-            throw new RuntimeException('Kopia zawiera niedozwolone pliki. Przywracanie zostalo przerwane.');
+            throw new RuntimeException(forum_t('Kopia zawiera niedozwolone pliki. Przywracanie zostalo przerwane.'));
         }
         if ($name === 'forum-data/forum.sqlite') {
             $hasDatabase = true;
@@ -275,7 +275,7 @@ function forum_ext_restore_backup_with_phar(string $tmpName): void
     }
 
     if (!$hasDatabase) {
-        throw new RuntimeException('Kopia zapasowa nie zawiera pliku forum-data/forum.sqlite.');
+        throw new RuntimeException(forum_t('Kopia zapasowa nie zawiera pliku forum-data/forum.sqlite.'));
     }
 
     forum_ext_clean_directory_contents(FORUM_AVATAR_DIR);
@@ -290,12 +290,12 @@ function forum_ext_restore_backup_with_phar(string $tmpName): void
 function forum_ext_restore_backup(array $file): void
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Nie wybrano poprawnego pliku kopii zapasowej.');
+        throw new RuntimeException(forum_t('Nie wybrano poprawnego pliku kopii zapasowej.'));
     }
 
     $tmpName = (string) ($file['tmp_name'] ?? '');
     if ($tmpName === '' || !is_uploaded_file($tmpName)) {
-        throw new RuntimeException('Nie udalo sie odebrac przeslanego pliku kopii zapasowej.');
+        throw new RuntimeException(forum_t('Nie udalo sie odebrac przeslanego pliku kopii zapasowej.'));
     }
 
     if (class_exists('ZipArchive')) {
