@@ -1,5 +1,31 @@
 # Changelog
 
+## ForumForgeCMS 1.4
+
+### Added
+
+- Persistent, atomic SQLite login protection with account and IP counters and temporary 15-minute lockouts.
+- Shared account protection for username/email sign-in, unaffected by new browser sessions.
+- Public, members-only, staff-only, and administrator-only hidden forum visibility.
+- Separate read-only forum mode, with server-side enforcement for creating topics, replying, and editing.
+- Permission-aware search, recent activity, profile activity, content counters, moderation, and direct content access.
+- Paginated on-site notifications with unread counts, individual opening, and mark-all-read actions.
+- Reply notifications for topic authors and previous participants, private-message notifications, and staff report notifications.
+- Permission checks when notifications are viewed; closed report notifications disappear for all staff.
+- Public profile fields: about me, location, website, and a plain-text signature shown below posts.
+- Administrator editing of public profile fields in user management.
+- PL/EN/DE translations for the new features and the topic description.
+- Regression coverage for the role/visibility matrix, forged writes, profile validation, notification ownership, and persistent login locks.
+- HTTP workflow tests and a 16-process test of atomic login attempt reservations.
+
+### Security And Behavior
+
+- Profile and signature output is HTML-escaped; external links allow only HTTP/HTTPS without embedded credentials.
+- Notification links resolve to the matching post and its pagination page.
+- Opening a private message also marks its notification read.
+- Successful login and completed password reset clear the account's login failure state.
+- Existing SMTP/mail behavior is unchanged. No database migration workflow is included.
+
 ## ForumForgeCMS 1.3
 
 ### Added

@@ -4,7 +4,7 @@ ForumForgeCMS is a lightweight, self-hosted forum CMS built for classic PHP host
 
 The project focuses on practical deployment, readable moderation workflows, and a complete forum experience that can be hosted on standard web hosting packages such as Strato-style PHP hosting.
 
-Current release: **ForumForgeCMS 1.3**
+Current release: **ForumForgeCMS 1.4**
 
 ## Live Demo
 
@@ -30,6 +30,10 @@ Try ForumForgeCMS online:
 - Multilingual interface support for English, Polish, and German
 - Explicit UTF-8 language dictionaries for interface labels, validation, editor prompts, and system emails
 - Administrator-controlled registration question, blocked email domains, usernames, and IPv4/IPv6 addresses
+- Persistent login lockouts stored in SQLite, independent of browser sessions
+- Forum visibility rules and a separate read-only setting
+- On-site notifications for topic replies, private messages, and post reports
+- Public profiles with about-me text, location, website, and a plain-text post signature
 - Administrator backup and restore tools for the SQLite database, avatars, and custom forum logo
 - Visible ForumForgeCMS version information in the administrator panel
 - Basic SQLite performance settings and indexes for small to medium communities
@@ -54,6 +58,43 @@ Try ForumForgeCMS online:
 ![ForumForgeCMS admin backup and restore](screen/A3.png)
 
 ![ForumForgeCMS admin management view](screen/A4.png)
+
+## What's New in 1.4
+
+### Persistent Login Protection
+
+Login protection now uses atomic SQLite reservations instead of relying on a browser session. It applies a 15-minute lockout after eight failed attempts against an account or thirty failed attempts from an IP within the protection window. Starting a new session does not reset the counters. Username and email sign-in share the same account counter. Successful authentication clears account failures; a completed password reset also clears the account lock. IP-wide failures remain independent.
+
+Only hashed account/IP keys and counters are stored. As with IP block lists, checks use the server-provided `REMOTE_ADDR`. Configure trusted real-IP handling on the web server when using a reverse proxy. Other existing action limits remain session-based.
+
+### Forum Permissions
+
+Administrators can choose visibility when creating or editing a forum:
+
+| Visibility | Guests | Members | Moderators | Administrators |
+| --- | --- | --- | --- | --- |
+| Public | Yes | Yes | Yes | Yes |
+| Members only | No | Yes | Yes | Yes |
+| Moderators and administrators | No | No | Yes | Yes |
+| Hidden | No | No | No | Yes |
+
+Read-only is a separate option: members cannot create topics, reply, or edit posts in that forum. Moderators and administrators retain writing/moderation access where the visibility rule allows it. Likes and reports remain available to signed-in users who can read the content.
+
+Permissions are enforced server-side and filter direct URLs, search results, recent activity, public profile activity, content counters, reports, and notifications. Restricted content is not merely hidden with CSS. Public forums remain the default for new installations.
+
+### On-Site Notifications
+
+The account area now includes a notification inbox with an unread badge, twenty entries per page, individual opening, and a mark-all-read action. New replies notify the topic author and earlier participants, excluding the reply author. Private messages notify the recipient. Post reports notify eligible moderators and administrators, and closing a report removes its report notifications for everyone.
+
+Notification access is checked again when listing or opening an entry. Role changes, restricted forums, deleted messages, and closed reports are respected. Reply notifications link to the correct post and topic page. This release adds on-site notifications, not email or push subscriptions.
+
+### Extended Profiles
+
+Members can edit their public profile from **My account**. Administrators can moderate these fields from the user's administration page. Available fields are about me (2,000 characters), location (100), website (255), and signature (300). Signatures appear below the author's posts.
+
+Profile text and signatures are plain text with HTML escaping. Website links must use HTTP or HTTPS, cannot contain login credentials, and are marked as user-generated external links. New labels, validation messages, and notification text are available in English, Polish, and German.
+
+Version 1.4 is a clean-install release. No migration from an older database schema is included; backups from earlier schemas are not supported by this installation workflow. Backups made by 1.4 include the new profile, permission, notification, and login-protection data.
 
 ## What's New in 1.3
 

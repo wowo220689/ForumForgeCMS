@@ -37,6 +37,8 @@ function forum_ext_boot(): void
 
     forum_ext_ensure_storage_directories();
     forum_ext_migrate_schema(forum_db());
+    forum_security_schema(forum_db());
+    forum_notifications_schema(forum_db());
     $booted = true;
 }
 
@@ -424,10 +426,10 @@ function forum_ext_admin_summary(): array
 
     return [
         'users' => (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(),
-        'categories' => (int) $pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn(),
-        'topics' => (int) $pdo->query('SELECT COUNT(*) FROM topics')->fetchColumn(),
-        'posts' => (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn(),
-        'likes' => (int) $pdo->query('SELECT COUNT(*) FROM post_likes')->fetchColumn(),
+        'categories' => (int) $pdo->query('SELECT COUNT(*) FROM categories c WHERE ' . forum_visibility_sql('c'))->fetchColumn(),
+        'topics' => (int) $pdo->query('SELECT COUNT(*) FROM topics t WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
+        'posts' => (int) $pdo->query('SELECT COUNT(*) FROM posts p JOIN topics t ON t.id=p.topic_id WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
+        'likes' => (int) $pdo->query('SELECT COUNT(*) FROM post_likes pl JOIN posts p ON p.id=pl.post_id JOIN topics t ON t.id=p.topic_id WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
         'messages' => (int) $pdo->query('SELECT COUNT(*) FROM private_messages')->fetchColumn(),
     ];
 }
@@ -444,18 +446,18 @@ function forum_ext_top_users(int $limit = 8): array
             (
                 SELECT COUNT(*)
                 FROM topics t
-                WHERE t.user_id = u.id
+                WHERE t.user_id = u.id AND ' . forum_visible_topic_sql('t') . '
             ) AS topic_count,
             (
                 SELECT COUNT(*)
                 FROM posts p
-                WHERE p.user_id = u.id
+                WHERE p.user_id = u.id AND p.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS post_count,
             (
                 SELECT COUNT(*)
                 FROM post_likes pl
                 INNER JOIN posts p2 ON p2.id = pl.post_id
-                WHERE p2.user_id = u.id
+                WHERE p2.user_id = u.id AND p2.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS likes_received
          FROM users u
          ORDER BY post_count DESC, topic_count DESC, likes_received DESC, u.username ASC
@@ -478,6 +480,7 @@ function forum_ext_admin_users_sql(): string
         u.id,
         u.username,
         u.email,
+        u.about_me, u.location, u.website, u.signature,
         u.role,
         u.created_at,
         u.last_login_at,

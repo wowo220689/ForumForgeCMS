@@ -39,23 +39,15 @@ function forum_ext_count_search_results(string $query): int
     }
 
     $stmt = forum_db()->prepare(
-        <<<'SQL'
-        SELECT SUM(match_count)
-         FROM (
-            SELECT COUNT(*) AS match_count
-            FROM topics t
-            WHERE t.title LIKE :pattern ESCAPE '\'
-
+        'SELECT SUM(match_count) FROM (
+            SELECT COUNT(*) AS match_count FROM topics t JOIN categories c ON c.id=t.category_id
+            WHERE ' . forum_visibility_sql('c') . ' AND t.title LIKE :pattern ESCAPE CHAR(92)
             UNION ALL
-
-            SELECT COUNT(*) AS match_count
-            FROM posts p
-            WHERE p.body LIKE :pattern ESCAPE '\'
-         )
-        SQL
+            SELECT COUNT(*) AS match_count FROM posts p JOIN topics t ON t.id=p.topic_id JOIN categories c ON c.id=t.category_id
+            WHERE ' . forum_visibility_sql('c') . ' AND p.body LIKE :pattern ESCAPE CHAR(92)
+        )'
     );
     $stmt->execute([':pattern' => forum_ext_search_like_pattern($query)]);
-
     return (int) $stmt->fetchColumn();
 }
 
@@ -66,8 +58,9 @@ function forum_ext_search_results(string $query, int $page = 1, int $perPage = F
     }
 
     $offset = (max(1, $page) - 1) * max(1, $perPage);
+    $visibility = forum_visibility_sql('c');
     $stmt = forum_db()->prepare(
-        <<<'SQL'
+        <<<SQL
         SELECT *
          FROM (
             SELECT
@@ -89,7 +82,7 @@ function forum_ext_search_results(string $query, int $page = 1, int $perPage = F
             FROM topics t
             INNER JOIN categories c ON c.id = t.category_id
             INNER JOIN users u ON u.id = t.user_id
-            WHERE t.title LIKE :pattern ESCAPE '\'
+            WHERE {$visibility} AND t.title LIKE :pattern ESCAPE CHAR(92)
 
             UNION ALL
 
@@ -117,7 +110,7 @@ function forum_ext_search_results(string $query, int $page = 1, int $perPage = F
             INNER JOIN topics t ON t.id = p.topic_id
             INNER JOIN categories c ON c.id = t.category_id
             INNER JOIN users u ON u.id = p.user_id
-            WHERE p.body LIKE :pattern ESCAPE '\'
+            WHERE {$visibility} AND p.body LIKE :pattern ESCAPE CHAR(92)
          )
          ORDER BY result_at DESC, topic_id DESC, post_id DESC
          LIMIT :limit OFFSET :offset

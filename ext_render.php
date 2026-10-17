@@ -152,6 +152,7 @@ function forum_ext_render_header(string $title, string $description): void
               </div>
               <div class="forum-button-row">
                 <a class="button-secondary" href="<?php echo forum_url(['view' => 'account']); ?>"><?php echo forum_escape(forum_t('Moje konto')); ?></a>
+                <a class="button-secondary" href="<?php echo forum_url(['view' => 'notifications']); ?>"><?php echo forum_escape(forum_t('notifications.title')); ?><?php $unread = forum_notifications_count($user, true); if ($unread > 0): ?> (<?php echo $unread; ?>)<?php endif; ?></a>
                 <a class="button-secondary" href="<?php echo forum_url(['view' => 'messages']); ?>">
                   <?php echo forum_escape(forum_t('Wiadomości')); ?><?php if ((int) ($user['unread_message_count'] ?? 0) > 0): ?> (<?php echo (int) $user['unread_message_count']; ?>)<?php endif; ?>
                 </a>

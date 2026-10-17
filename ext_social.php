@@ -8,6 +8,7 @@ function forum_ext_fetch_topic(int $topicId): ?array
             t.*,
             c.name AS category_name,
             c.id AS category_id,
+            c.visibility, c.read_only,
             u.username AS author_username,
             lp.username AS last_post_username,
             (
@@ -19,7 +20,7 @@ function forum_ext_fetch_topic(int $topicId): ?array
          INNER JOIN categories c ON c.id = t.category_id
          INNER JOIN users u ON u.id = t.user_id
          INNER JOIN users lp ON lp.id = t.last_post_user_id
-         WHERE t.id = :id
+         WHERE t.id = :id AND ' . forum_visibility_sql('c') . '
          LIMIT 1'
     );
     $stmt->execute([':id' => $topicId]);
@@ -30,31 +31,34 @@ function forum_ext_fetch_topic(int $topicId): ?array
 
 function forum_ext_fetch_posts_for_topic(int $topicId, int $viewerUserId = 0, int $page = 1, int $perPage = FORUM_POSTS_PER_PAGE): array
 {
+    if (!forum_fetch_topic($topicId)) { return []; }
     $pagination = forum_pagination(forum_count_posts_for_topic($topicId), $page, $perPage);
     $stmt = forum_db()->prepare(
         'SELECT
             p.*,
+            t.category_id, c.visibility, c.read_only,
             u.id AS profile_user_id,
             u.username,
             u.role,
             u.avatar_filename,
             u.avatar_updated_at,
+            u.signature,
             eu.username AS edited_by_username,
             (
                 SELECT COUNT(*)
                 FROM posts up
-                WHERE up.user_id = u.id
+                WHERE up.user_id = u.id AND up.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS user_post_count,
             (
                 SELECT COUNT(*)
                 FROM topics ut
-                WHERE ut.user_id = u.id
+                WHERE ut.user_id = u.id AND ' . forum_visible_topic_sql('ut') . '
             ) AS user_topic_count,
             (
                 SELECT COUNT(*)
                 FROM post_likes upl
                 INNER JOIN posts lp ON lp.id = upl.post_id
-                WHERE lp.user_id = u.id
+                WHERE lp.user_id = u.id AND lp.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS user_likes_received,
             (
                 SELECT COUNT(*)
@@ -77,6 +81,8 @@ function forum_ext_fetch_posts_for_topic(int $topicId, int $viewerUserId = 0, in
                 ) THEN 1 ELSE 0
             END AS is_topic_starter
          FROM posts p
+         INNER JOIN topics t ON t.id = p.topic_id
+         INNER JOIN categories c ON c.id = t.category_id
          INNER JOIN users u ON u.id = p.user_id
          LEFT JOIN users eu ON eu.id = p.edited_by_user_id
          WHERE p.topic_id = :topic_id
@@ -102,6 +108,7 @@ function forum_ext_fetch_post(int $postId): ?array
             t.title AS topic_title,
             t.id AS topic_id,
             c.name AS category_name,
+            c.visibility, c.read_only, c.id AS category_id,
             t.is_locked,
             CASE
                 WHEN p.id = (
@@ -116,7 +123,7 @@ function forum_ext_fetch_post(int $postId): ?array
          INNER JOIN topics t ON t.id = p.topic_id
          INNER JOIN categories c ON c.id = t.category_id
          INNER JOIN users u ON u.id = p.user_id
-         WHERE p.id = :id
+         WHERE p.id = :id AND ' . forum_visibility_sql('c') . '
          LIMIT 1'
     );
     $stmt->execute([':id' => $postId]);
@@ -127,7 +134,7 @@ function forum_ext_fetch_post(int $postId): ?array
 
 function forum_ext_user_can_edit_post(array $actor, array $post): bool
 {
-    return forum_is_staff($actor) || (int) $actor['id'] === (int) $post['user_id'];
+    return forum_category_writable($post, $actor) && (forum_is_staff($actor) || (int) $actor['id'] === (int) $post['user_id']);
 }
 
 function forum_ext_update_post(int $postId, array $actor, string $body, ?string $topicTitle = null): int
@@ -286,7 +293,7 @@ function forum_ext_quote_text_for_post(int $postId): string
     $lines = preg_split("/\r\n|\r|\n/", $body) ?: [];
     $quotedLines = array_map(static fn(string $line): string => '> ' . $line, array_slice($lines, 0, 12));
 
-    return '> ' . $author . " napisal(a):\n" . implode("\n", $quotedLines) . "\n\n";
+    return '> ' . forum_t('notifications.wrote', ['actor' => $author]) . "\n" . implode("\n", $quotedLines) . "\n\n";
 }
 
 function forum_ext_report_post(int $postId, int $reporterUserId, string $reason = ''): void
@@ -318,19 +325,28 @@ function forum_ext_report_post(int $postId, int $reporterUserId, string $reason 
         throw new RuntimeException(forum_t('Ten post jest juz przez Ciebie zgloszony.'));
     }
 
-    $pdo->prepare(
-        'INSERT INTO post_reports (post_id, reporter_user_id, reason, status, created_at)
-         VALUES (:post_id, :reporter_user_id, :reason, "open", :created_at)'
-    )->execute([
-        ':post_id' => $postId,
-        ':reporter_user_id' => $reporterUserId,
-        ':reason' => $reason,
-        ':created_at' => forum_now(),
-    ]);
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare(
+            'INSERT INTO post_reports (post_id, reporter_user_id, reason, status, created_at)
+             VALUES (:post_id, :reporter_user_id, :reason, "open", :created_at)'
+        )->execute([
+            ':post_id' => $postId,
+            ':reporter_user_id' => $reporterUserId,
+            ':reason' => $reason,
+            ':created_at' => forum_now(),
+        ]);
+        forum_notify_report($pdo, (int) $pdo->lastInsertId(), $postId, $reporterUserId);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
 }
 
 function forum_ext_open_post_reports(): array
 {
+    if (!forum_is_staff(forum_current_user())) { return []; }
     $stmt = forum_db()->query(
         'SELECT
             pr.*,
@@ -347,7 +363,7 @@ function forum_ext_open_post_reports(): array
          INNER JOIN categories c ON c.id = t.category_id
          INNER JOIN users reporter ON reporter.id = pr.reporter_user_id
          INNER JOIN users author ON author.id = p.user_id
-         WHERE pr.status = "open"
+         WHERE pr.status = "open" AND ' . forum_visibility_sql('c') . '
          ORDER BY pr.created_at ASC, pr.id ASC'
     );
 
@@ -356,6 +372,12 @@ function forum_ext_open_post_reports(): array
 
 function forum_ext_close_post_report(int $reportId, int $actorUserId): void
 {
+    $actor = forum_permission_user($actorUserId);
+    if (!forum_is_staff($actor)) { throw new RuntimeException(forum_t('permissions.denied')); }
+    $check = forum_db()->prepare('SELECT c.* FROM post_reports pr JOIN posts p ON p.id=pr.post_id JOIN topics t ON t.id=p.topic_id JOIN categories c ON c.id=t.category_id WHERE pr.id=:id');
+    $check->execute([':id' => $reportId]);
+    $category = $check->fetch();
+    if (!$category || !forum_category_visible($category, $actor)) { throw new RuntimeException(forum_t('permissions.denied')); }
     $stmt = forum_db()->prepare(
         'UPDATE post_reports
          SET status = "closed", closed_at = :closed_at, closed_by_user_id = :closed_by_user_id
@@ -371,6 +393,7 @@ function forum_ext_close_post_report(int $reportId, int $actorUserId): void
     if ($stmt->rowCount() === 0) {
         throw new RuntimeException(forum_t('Nie znaleziono aktywnego zgloszenia do zamkniecia.'));
     }
+    forum_db()->prepare('DELETE FROM notifications WHERE report_id=:id')->execute([':id' => $reportId]);
 }
 
 function forum_ext_fetch_user_profile(int $userId): ?array
@@ -380,6 +403,7 @@ function forum_ext_fetch_user_profile(int $userId): ?array
             u.id,
             u.username,
             u.email,
+            u.about_me, u.location, u.website, u.signature,
             u.role,
             u.created_at,
             u.last_login_at,
@@ -388,18 +412,18 @@ function forum_ext_fetch_user_profile(int $userId): ?array
             (
                 SELECT COUNT(*)
                 FROM topics t
-                WHERE t.user_id = u.id
+                WHERE t.user_id = u.id AND ' . forum_visible_topic_sql('t') . '
             ) AS topic_count,
             (
                 SELECT COUNT(*)
                 FROM posts p
-                WHERE p.user_id = u.id
+                WHERE p.user_id = u.id AND p.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS post_count,
             (
                 SELECT COUNT(*)
                 FROM post_likes pl
                 INNER JOIN posts p2 ON p2.id = pl.post_id
-                WHERE p2.user_id = u.id
+                WHERE p2.user_id = u.id AND p2.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS likes_received,
             (
                 SELECT COUNT(*)
@@ -428,7 +452,7 @@ function forum_ext_recent_posts_for_user(int $userId, int $limit = 5): array
             t.title AS topic_title
          FROM posts p
          INNER JOIN topics t ON t.id = p.topic_id
-         WHERE p.user_id = :user_id
+         WHERE p.user_id = :user_id AND ' . forum_visible_topic_sql('t') . '
          ORDER BY p.created_at DESC, p.id DESC
          LIMIT :limit'
     );
@@ -450,7 +474,7 @@ function forum_ext_recent_topics_for_user(int $userId, int $limit = 5): array
             c.name AS category_name
          FROM topics t
          INNER JOIN categories c ON c.id = t.category_id
-         WHERE t.user_id = :user_id
+         WHERE t.user_id = :user_id AND ' . forum_visibility_sql('c') . '
          ORDER BY t.created_at DESC, t.id DESC
          LIMIT :limit'
     );

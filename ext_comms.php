@@ -183,6 +183,8 @@ function forum_ext_mark_message_read(int $messageId, int $userId): void
         ':id' => $messageId,
         ':user_id' => $userId,
     ]);
+    forum_db()->prepare('UPDATE notifications SET read_at=COALESCE(read_at, :now) WHERE kind="message" AND message_id=:message AND user_id=:user')
+        ->execute([':now' => forum_now(), ':message' => $messageId, ':user' => $userId]);
 }
 
 function forum_ext_send_message(int $senderId, string $recipientLogin, string $subject, string $body): int
@@ -212,18 +214,28 @@ function forum_ext_send_message(int $senderId, string $recipientLogin, string $s
         throw new RuntimeException(forum_t('Nie możesz wysłać wiadomości do samego siebie.'));
     }
 
-    forum_db()->prepare(
-        'INSERT INTO private_messages (sender_id, recipient_id, subject, body, created_at)
-         VALUES (:sender_id, :recipient_id, :subject, :body, :created_at)'
-    )->execute([
-        ':sender_id' => $senderId,
-        ':recipient_id' => (int) $recipient['id'],
-        ':subject' => $subject,
-        ':body' => $body,
-        ':created_at' => forum_now(),
-    ]);
+    $pdo = forum_db();
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare(
+            'INSERT INTO private_messages (sender_id, recipient_id, subject, body, created_at)
+             VALUES (:sender_id, :recipient_id, :subject, :body, :created_at)'
+        )->execute([
+            ':sender_id' => $senderId,
+            ':recipient_id' => (int) $recipient['id'],
+            ':subject' => $subject,
+            ':body' => $body,
+            ':created_at' => forum_now(),
+        ]);
 
-    return (int) forum_db()->lastInsertId();
+        $messageId = (int) $pdo->lastInsertId();
+        forum_notification_insert($pdo, (int) $recipient['id'], 'message', $messageId, $senderId, ['message_id' => $messageId]);
+        $pdo->commit();
+        return $messageId;
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
 }
 
 function forum_ext_send_mail(string $to, string $subject, string $body): bool
@@ -343,6 +355,7 @@ function forum_ext_reset_password_with_token(string $selector, string $token, st
             ':used_at' => forum_now(),
             ':id' => (int) $record['id'],
         ]);
+        forum_security_clear_account((int) $record['user_id']);
 
         $pdo->commit();
     } catch (Throwable $e) {

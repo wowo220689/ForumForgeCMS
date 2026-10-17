@@ -84,6 +84,9 @@ foreach (glob($source . '/*.php') as $file) {
         if (($tokens[$j++] ?? null) !== '(') { continue; }
         while (isset($tokens[$j]) && is_array($tokens[$j]) && $tokens[$j][0] === T_WHITESPACE) { $j++; }
         if (is_array($tokens[$j] ?? null) && $tokens[$j][0] === T_CONSTANT_ENCAPSED_STRING) {
+            $next = $j + 1;
+            while (isset($tokens[$next]) && is_array($tokens[$next]) && $tokens[$next][0] === T_WHITESPACE) { $next++; }
+            if (($tokens[$next] ?? null) === '.') { continue; }
             $key = eval('return ' . $tokens[$j][1] . ';');
             check(isset($catalogs['en'][$key]), 'translated call: ' . basename($file) . ':' . $key);
         }
@@ -154,14 +157,18 @@ foreach (['pl', 'en', 'de'] as $language) {
     check(!str_contains($html, '<script>alert(1)</script>'), 'post escaped: ' . $language);
     foreach (['settings', 'basic-settings', 'antispam', 'backup', 'reports', 'users', 'top-users', 'forum-sections', 'create-forum-section', 'categories', 'create-category', 'user'] as $section) {
         $html = capture(fn() => forum_ext_render_admin_panel(forum_ext_admin_summary(), forum_fetch_categories(), forum_ext_top_users(), [$admin], $pagination, null, $section, 1));
-        check(str_contains($html, 'ForumForgeCMS 1.3'), 'admin view: ' . $language . ':' . $section);
+        check(str_contains($html, 'ForumForgeCMS ' . FORUM_VERSION), 'admin view: ' . $language . ':' . $section);
     }
     check(!str_contains(forum_t('mail.reset.body', ['username' => 'tester', 'url' => 'https://example.com', 'hours' => 2]), '{'), 'mail parameters');
     $footer = capture(fn() => forum_ext_render_footer());
     check(str_contains($footer, 'id="forum-i18n"'), 'browser dictionary');
 }
+require __DIR__ . '/version-1.4.php';
 forum_ext_store_setting(forum_db(), 'forum_language', 'en');
 forum_ext_current_language();
 forum_ext_apply_language_defaults('en');
 echo 'PASS: ' . $checks . " assertions\n";
-if (in_array('--keep', $argv, true)) { echo 'FIXTURE=' . $fixture . "\n"; }
+if (in_array('--keep', $argv, true)) {
+    file_put_contents($fixture . '/fixture.json', json_encode(['cases' => $fixtures, 'member' => (int) $member['id'], 'other' => (int) $other['id'], 'moderator' => (int) $moderator['id'], 'owned_topic' => $ownedTopic, 'notification_topic' => $notificationTopic], JSON_THROW_ON_ERROR));
+    echo 'FIXTURE=' . $fixture . "\n";
+}

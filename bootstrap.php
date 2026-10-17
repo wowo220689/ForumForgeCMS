@@ -3,9 +3,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/ext_i18n.php';
 require_once __DIR__ . '/ext_antispam.php';
+require_once __DIR__ . '/ext_permissions.php';
+require_once __DIR__ . '/ext_security.php';
+require_once __DIR__ . '/ext_notifications.php';
+require_once __DIR__ . '/ext_profile.php';
 
 const FORUM_TITLE = 'ForumForgeCMS';
-const FORUM_VERSION = '1.3';
+const FORUM_VERSION = '1.4';
 const FORUM_DB_PATH = __DIR__ . '/forum-data/forum.sqlite';
 const FORUM_ADMIN_USERNAME = 'admin';
 const FORUM_ADMIN_EMAIL = '';
@@ -104,6 +108,10 @@ function forum_initialize_database(PDO $pdo): void
             email TEXT NOT NULL UNIQUE COLLATE NOCASE,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT "member",
+            about_me TEXT NOT NULL DEFAULT "",
+            location TEXT NOT NULL DEFAULT "",
+            website TEXT NOT NULL DEFAULT "",
+            signature TEXT NOT NULL DEFAULT "",
             created_at TEXT NOT NULL,
             last_login_at TEXT
         )'
@@ -114,6 +122,8 @@ function forum_initialize_database(PDO $pdo): void
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT "",
+            visibility TEXT NOT NULL DEFAULT "public" CHECK(visibility IN ("public", "members", "staff", "hidden")),
+            read_only INTEGER NOT NULL DEFAULT 0 CHECK(read_only IN (0,1)),
             position INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )'
@@ -964,10 +974,13 @@ function forum_login_user(string $login, string $password): void
     $stmt->execute([':login' => $login]);
     $user = $stmt->fetch();
 
-    if (!$user || !password_verify($password, (string) $user['password_hash'])) {
+    $guardKeys = forum_security_login_reserve($login, $user ?: null);
+    $validPassword = password_verify($password, $user ? (string) $user['password_hash'] : '$2y$12$XIdtLqOxAHvCptMgN9mdGefTX68anhQkpATK1SNGTSWpW7dU/FcyK');
+    if (!$user || !$validPassword) {
         throw new RuntimeException(forum_t('Nie udało się zalogować. Sprawdź login i hasło.'));
     }
 
+    forum_security_login_succeeded($guardKeys);
     session_regenerate_id(true);
     $_SESSION['forum_user_id'] = (int) $user['id'];
 
@@ -1106,6 +1119,7 @@ function forum_fetch_categories(): array
             LEFT JOIN forum_sections fs ON fs.id = c.section_id
             LEFT JOIN topics t ON t.category_id = c.id
             LEFT JOIN posts p ON p.topic_id = t.id
+            WHERE ' . forum_visibility_sql('c') . '
             GROUP BY c.id
             ORDER BY COALESCE(fs.position, 999999) ASC, COALESCE(c.section_position, c.position) ASC, c.id ASC';
     return forum_db()->query($sql)->fetchAll();
@@ -1141,7 +1155,7 @@ function forum_fetch_sections_with_categories(): array
 
 function forum_fetch_category(int $categoryId): ?array
 {
-    $stmt = forum_db()->prepare('SELECT * FROM categories WHERE id = :id LIMIT 1');
+    $stmt = forum_db()->prepare('SELECT c.* FROM categories c WHERE c.id = :id AND ' . forum_visibility_sql('c') . ' LIMIT 1');
     $stmt->execute([':id' => $categoryId]);
     $category = $stmt->fetch();
     return $category ?: null;
@@ -1149,6 +1163,7 @@ function forum_fetch_category(int $categoryId): ?array
 
 function forum_count_topics_for_category(int $categoryId): int
 {
+    if (!forum_fetch_category($categoryId)) { return 0; }
     $stmt = forum_db()->prepare('SELECT COUNT(*) FROM topics WHERE category_id = :category_id');
     $stmt->execute([':category_id' => $categoryId]);
     return (int) $stmt->fetchColumn();
@@ -1156,6 +1171,7 @@ function forum_count_topics_for_category(int $categoryId): int
 
 function forum_fetch_topics_for_category(int $categoryId, int $page = 1, int $perPage = FORUM_TOPICS_PER_PAGE): array
 {
+    if (!forum_fetch_category($categoryId)) { return []; }
     $total = forum_count_topics_for_category($categoryId);
     $pagination = forum_pagination($total, $page, $perPage);
     $stmt = forum_db()->prepare(
@@ -1187,13 +1203,14 @@ function forum_fetch_topic(int $topicId): ?array
             t.*,
             c.name AS category_name,
             c.id AS category_id,
+            c.visibility, c.read_only,
             u.username AS author_username,
             lp.username AS last_post_username
          FROM topics t
          INNER JOIN categories c ON c.id = t.category_id
          INNER JOIN users u ON u.id = t.user_id
          INNER JOIN users lp ON lp.id = t.last_post_user_id
-         WHERE t.id = :id
+         WHERE t.id = :id AND ' . forum_visibility_sql('c') . '
          LIMIT 1'
     );
     $stmt->execute([':id' => $topicId]);
@@ -1203,6 +1220,7 @@ function forum_fetch_topic(int $topicId): ?array
 
 function forum_count_posts_for_topic(int $topicId): int
 {
+    if (!forum_fetch_topic($topicId)) { return 0; }
     $stmt = forum_db()->prepare('SELECT COUNT(*) FROM posts WHERE topic_id = :topic_id');
     $stmt->execute([':topic_id' => $topicId]);
     return (int) $stmt->fetchColumn();
@@ -1210,6 +1228,7 @@ function forum_count_posts_for_topic(int $topicId): int
 
 function forum_fetch_posts_for_topic(int $topicId, int $page = 1, int $perPage = FORUM_POSTS_PER_PAGE): array
 {
+    if (!forum_fetch_topic($topicId)) { return []; }
     $total = forum_count_posts_for_topic($topicId);
     $pagination = forum_pagination($total, $page, $perPage);
     $stmt = forum_db()->prepare(
@@ -1232,6 +1251,7 @@ function forum_fetch_posts_for_topic(int $topicId, int $page = 1, int $perPage =
 
 function forum_create_topic(PDO $pdo, int $categoryId, int $userId, string $title, string $body, bool $pin = false): int
 {
+    forum_assert_category_write($pdo, $categoryId, $userId);
     $title = forum_trimmed_text($title, 140);
     $body = forum_trimmed_text($body, 12000);
 
@@ -1289,6 +1309,14 @@ function forum_create_topic_from_request(int $categoryId, int $userId, string $t
 
 function forum_create_post(int $topicId, int $userId, string $body): void
 {
+    $check = forum_db()->prepare('SELECT category_id, is_locked FROM topics WHERE id=:id');
+    $check->execute([':id' => $topicId]);
+    $topic = $check->fetch();
+    if (!$topic) { throw new RuntimeException(forum_t('Nie znaleziono tematu.')); }
+    forum_assert_category_write(forum_db(), (int) $topic['category_id'], $userId);
+    if (!empty($topic['is_locked']) && !forum_is_staff(forum_permission_user($userId))) {
+        throw new RuntimeException(forum_t('Ten temat jest zamknięty.'));
+    }
     $body = forum_trimmed_text($body, 12000);
     if ($body === '' || strlen($body) < 3) {
         throw new RuntimeException(forum_t('Odpowiedz jest za kr?tka.'));
@@ -1308,6 +1336,8 @@ function forum_create_post(int $topicId, int $userId, string $body): void
             ':body' => $body,
             ':created_at' => $timestamp,
         ]);
+        $postId = (int) $pdo->lastInsertId();
+        forum_notify_reply($pdo, $topicId, $postId, $userId);
 
         $updateTopic = $pdo->prepare(
             'UPDATE topics
@@ -1370,8 +1400,9 @@ function forum_update_forum_section(int $sectionId, string $name, string $descri
     ]);
 }
 
-function forum_create_category(string $name, string $description, int $sectionId = 0): void
+function forum_create_category(string $name, string $description, int $sectionId = 0, string $visibility = 'public', bool $readOnly = false): void
 {
+    $permissions = forum_permission_values($visibility, $readOnly);
     $name = forum_trimmed_text($name, 80);
     $description = forum_trimmed_text($description, 260);
 
@@ -1385,8 +1416,8 @@ function forum_create_category(string $name, string $description, int $sectionId
     $sectionPositionStmt->execute([':section_id' => $sectionId]);
     $sectionPosition = (int) $sectionPositionStmt->fetchColumn();
     $stmt = forum_db()->prepare(
-        'INSERT INTO categories (name, description, position, section_id, section_position, created_at)
-         VALUES (:name, :description, :position, :section_id, :section_position, :created_at)'
+        'INSERT INTO categories (name, description, position, section_id, section_position, created_at, visibility, read_only)
+         VALUES (:name, :description, :position, :section_id, :section_position, :created_at, :visibility, :read_only)'
     );
     $stmt->execute([
         ':name' => $name,
@@ -1394,12 +1425,14 @@ function forum_create_category(string $name, string $description, int $sectionId
         ':position' => $position,
         ':section_id' => $sectionId,
         ':section_position' => $sectionPosition,
+        ':visibility' => $permissions['visibility'], ':read_only' => $permissions['read_only'],
         ':created_at' => forum_now(),
     ]);
 }
 
-function forum_update_category(int $categoryId, string $name, string $description, int $sectionId = 0): void
+function forum_update_category(int $categoryId, string $name, string $description, int $sectionId = 0, string $visibility = 'public', bool $readOnly = false): void
 {
+    $permissions = forum_permission_values($visibility, $readOnly);
     $name = forum_trimmed_text($name, 80);
     $description = forum_trimmed_text($description, 260);
 
@@ -1421,23 +1454,25 @@ function forum_update_category(int $categoryId, string $name, string $descriptio
     }
 
     if ($sectionPosition !== null) {
-        $stmt = $pdo->prepare('UPDATE categories SET name = :name, description = :description, section_id = :section_id, section_position = :section_position WHERE id = :id');
+        $stmt = $pdo->prepare('UPDATE categories SET name = :name, description = :description, section_id = :section_id, section_position = :section_position, visibility = :visibility, read_only = :read_only WHERE id = :id');
         $stmt->execute([
             ':name' => $name,
             ':description' => $description,
             ':section_id' => $sectionId,
             ':section_position' => $sectionPosition,
+            ':visibility' => $permissions['visibility'], ':read_only' => $permissions['read_only'],
             ':id' => $categoryId,
         ]);
         forum_reindex_section_categories($currentSectionId);
         return;
     }
 
-    $stmt = $pdo->prepare('UPDATE categories SET name = :name, description = :description, section_id = :section_id WHERE id = :id');
+    $stmt = $pdo->prepare('UPDATE categories SET name = :name, description = :description, section_id = :section_id, visibility = :visibility, read_only = :read_only WHERE id = :id');
     $stmt->execute([
         ':name' => $name,
         ':description' => $description,
         ':section_id' => $sectionId,
+        ':visibility' => $permissions['visibility'], ':read_only' => $permissions['read_only'],
         ':id' => $categoryId,
     ]);
 }
@@ -1557,6 +1592,7 @@ function forum_toggle_topic_flag(int $topicId, string $flag): void
 
 function forum_delete_topic(int $topicId): void
 {
+    if (!forum_fetch_topic($topicId)) { throw new RuntimeException(forum_t('permissions.denied')); }
     $stmt = forum_db()->prepare('DELETE FROM topics WHERE id = :id');
     $stmt->execute([':id' => $topicId]);
 }
@@ -1566,9 +1602,9 @@ function forum_admin_summary(): array
     $pdo = forum_db();
     return [
         'users' => (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(),
-        'categories' => (int) $pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn(),
-        'topics' => (int) $pdo->query('SELECT COUNT(*) FROM topics')->fetchColumn(),
-        'posts' => (int) $pdo->query('SELECT COUNT(*) FROM posts')->fetchColumn(),
+        'categories' => (int) $pdo->query('SELECT COUNT(*) FROM categories c WHERE ' . forum_visibility_sql('c'))->fetchColumn(),
+        'topics' => (int) $pdo->query('SELECT COUNT(*) FROM topics t WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
+        'posts' => (int) $pdo->query('SELECT COUNT(*) FROM posts p JOIN topics t ON t.id=p.topic_id WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
     ];
 }
 
@@ -1586,6 +1622,7 @@ function forum_recent_topics(int $limit = 8): array
          INNER JOIN users u ON u.id = t.user_id
          INNER JOIN users lp ON lp.id = t.last_post_user_id
          LEFT JOIN posts p ON p.topic_id = t.id
+         WHERE ' . forum_visibility_sql('c') . '
          GROUP BY t.id
          ORDER BY t.is_pinned DESC, t.last_post_at DESC
          LIMIT :limit'

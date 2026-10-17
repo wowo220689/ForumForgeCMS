@@ -2,6 +2,42 @@
   margin-bottom: 24px;
 }
 
+.forum-profile-detail,
+.forum-post-signature {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.forum-profile-detail {
+  margin-top: 14px;
+}
+
+.forum-profile-detail p {
+  margin: 5px 0 0;
+}
+
+.forum-post-signature {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--text-soft);
+}
+
+.forum-notification-unread .forum-row-main {
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 10px;
+}
+
+#profile-signature { min-height: 84px; }
+#profile-about_me { min-height: 120px; }
+
+.forum-notifications h2,
+.forum-notifications .forum-row-main {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .forum-hero-grid,
 .forum-grid-two,
 .forum-profile-grid {

@@ -190,7 +190,7 @@ function forum_ext_render_category(array $category, array $topics, array $pagina
     ?>
     <section class="panel forum-panel">
       <div class="forum-section-head">
-        <div><span class="eyebrow"><?php echo forum_escape(forum_t('Dział forum')); ?></span><h2><?php echo forum_escape($category['name']); ?></h2><p class="lead forum-lead"><?php echo forum_escape($category['description']); ?></p></div>
+        <div><span class="eyebrow"><?php echo forum_escape(forum_t('Dział forum')); ?></span><h2><?php echo forum_escape($category['name']); ?></h2><p class="lead forum-lead"><?php echo forum_escape($category['description']); ?></p><?php if (!empty($category['read_only'])): ?><span class="forum-badge forum-badge-muted"><?php echo forum_escape(forum_t('permissions.read_only')); ?></span><?php endif; ?></div>
         <div class="forum-button-row"><a class="button-secondary" href="<?php echo forum_url(); ?>"><?php echo forum_escape(forum_t('Wróć do listy działów')); ?></a></div>
       </div>
       <?php if ($topics === []): ?>
@@ -211,7 +211,7 @@ function forum_ext_render_category(array $category, array $topics, array $pagina
       <?php endif; ?>
     </section>
 
-    <?php if ($currentUser): ?>
+    <?php if (forum_category_writable($category, $currentUser)): ?>
       <section class="panel forum-panel">
         <span class="eyebrow"><?php echo forum_escape(forum_t('Nowy temat')); ?></span>
         <h2><?php echo forum_escape(forum_t('Rozpocznij nową dyskusję')); ?></h2>
@@ -332,7 +332,7 @@ function forum_ext_render_search(string $query, array $results, array $paginatio
 
 function forum_ext_render_topic(array $topic, array $posts, array $pagination, ?array $currentUser, ?array $flash, ?array $editPost = null): void
 {
-    forum_ext_render_header($topic['title'], 'Dyskusja na forum ForumForgeCMS');
+    forum_ext_render_header($topic['title'], forum_t('Dyskusja na forum ForumForgeCMS'));
     forum_ext_render_flash($flash);
     ?>
     <section class="panel forum-panel">
@@ -385,10 +385,11 @@ function forum_ext_render_topic(array $topic, array $posts, array $pagination, ?
                   <p class="forum-edit-note"><?php echo forum_escape(forum_t('Ostatnio edytowano przez:')); ?> <strong><?php echo forum_escape((string) ($post['edited_by_username'] ?? $post['username'] ?? forum_t('użytkownik'))); ?></strong>, <?php echo forum_escape(forum_format_date($post['updated_at'])); ?></p>
                 <?php endif; ?>
               <?php endif; ?>
+              <?php if (!empty($post['signature'])): ?><div class="forum-post-signature"><?php echo nl2br(forum_escape($post['signature'])); ?></div><?php endif; ?>
               <div class="forum-post-actions">
                 <span class="forum-like-count"><?php echo (int) $post['like_count']; ?> <?php echo forum_escape(forum_t('lajków')); ?></span>
                 <?php if ($currentUser): ?><form class="forum-inline-form" method="post" action="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1)]); ?>"><input type="hidden" name="action" value="like_post"><input type="hidden" name="post_id" value="<?php echo (int) $post['id']; ?>"><input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>"><button class="button-secondary forum-like-button<?php echo (int) $post['viewer_liked'] === 1 ? ' is-active' : ''; ?>" type="submit" title="<?php echo (int) $post['viewer_liked'] === 1 ? 'Cofnij lajka' : 'Polub ten post'; ?>"><?php forum_ext_render_like_icon((int) $post['viewer_liked'] === 1); ?><span class="visually-hidden"><?php echo (int) $post['viewer_liked'] === 1 ? 'Cofnij lajka' : forum_t('Lubię to'); ?></span></button></form><?php endif; ?>
-                <?php if ($currentUser): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1), 'quote_post' => (int) $post['id']]); ?>#reply-body"><?php echo forum_escape(forum_t('Cytuj')); ?></a><?php endif; ?>
+                <?php if (forum_category_writable($topic, $currentUser) && (!(int) $topic['is_locked'] || forum_is_staff($currentUser))): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1), 'quote_post' => (int) $post['id']]); ?>#reply-body"><?php echo forum_escape(forum_t('Cytuj')); ?></a><?php endif; ?>
                 <?php if ($currentUser && (int) $currentUser['id'] !== (int) $post['user_id']): ?><form class="forum-inline-form" method="post" action="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1)]); ?>"><input type="hidden" name="action" value="report_post"><input type="hidden" name="post_id" value="<?php echo (int) $post['id']; ?>"><input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>"><button class="button-secondary" type="submit"><?php echo forum_escape(forum_t('Zgłoś')); ?></button></form><?php endif; ?>
                 <?php if ($currentUser && forum_ext_user_can_edit_post($currentUser, $post)): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1), 'edit_post' => (int) $post['id']]); ?>#edit-post-form"><?php echo forum_escape(forum_t('Edytuj')); ?></a><?php endif; ?>
                 <?php if ($currentUser && (int) $currentUser['id'] !== (int) $post['user_id']): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'compose', 'to' => $post['username']]); ?>"><?php echo forum_escape(forum_t('Napisz wiadomość')); ?></a><?php endif; ?>
@@ -421,6 +422,7 @@ function forum_ext_render_account(array $profile, array $recentTopics, array $re
           </div>
         </article>
         <div class="forum-stack">
+          <?php forum_profile_render_form($profile); ?>
           <article class="forum-surface-card">
             <div class="forum-post-body">
               <span class="eyebrow"><?php echo forum_escape(forum_t('Avatar')); ?></span>
@@ -610,6 +612,7 @@ function forum_ext_render_user(array $profile, array $recentTopics, array $recen
             <article class="forum-stat-box"><strong><?php echo forum_escape(forum_format_date($profile['created_at'])); ?></strong><span><?php echo forum_escape(forum_t('na forum od')); ?></span></article>
           </div>
           <?php if ($currentUser && (int) $currentUser['id'] !== (int) $profile['id']): ?><a class="button" href="<?php echo forum_url(['view' => 'compose', 'to' => $profile['username']]); ?>"><?php echo forum_escape(forum_t('Napisz wiadomość')); ?></a><?php endif; ?>
+          <?php forum_profile_render_details($profile); ?>
         </article>
         <div class="forum-stack">
           <article class="forum-surface-card"><div class="forum-post-body"><span class="eyebrow"><?php echo forum_escape(forum_t('Ostatnie tematy')); ?></span><div class="forum-list forum-list-compact"><?php foreach ($recentTopics as $topic): ?><article class="forum-row forum-row-tight"><div class="forum-row-main"><h3><a href="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id']]); ?>"><?php echo forum_escape($topic['title']); ?></a></h3><p><?php echo forum_escape($topic['category_name']); ?></p></div></article><?php endforeach; ?></div></div></article>
@@ -1006,6 +1009,7 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
               </div>
             <?php endif; ?>
           </article>
+          <?php forum_profile_render_form(forum_ext_fetch_user_profile((int) $selectedUser['id']) ?? $selectedUser, true); ?>
         </section>
         <?php endif; ?>
 
@@ -1118,6 +1122,7 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
                           <textarea name="description" maxlength="260" required><?php echo forum_escape($category['description']); ?></textarea>
                         </div>
                       </div>
+                      <?php forum_render_permission_fields($category); ?>
                       <button class="button" type="submit"><?php echo forum_escape(forum_t('Zapisz dział')); ?></button>
                     </form>
                     <div class="forum-button-row">
@@ -1161,6 +1166,7 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
             </select>
             <label for="category-description"><?php echo forum_escape(forum_t('Opis działu')); ?></label>
             <textarea id="category-description" name="description" maxlength="260" required></textarea>
+            <?php forum_render_permission_fields(); ?>
             <button class="button" type="submit"><?php echo forum_escape(forum_t('Dodaj dział')); ?></button>
           </form>
         </section>
