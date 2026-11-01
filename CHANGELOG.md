@@ -1,5 +1,33 @@
 # Changelog
 
+## ForumForgeCMS 1.5
+
+Released: 2026-11-01
+
+### Added
+
+- Administrator hosting diagnostics for PHP, PDO SQLite, sessions, database integrity, foreign keys, writable directories, mail() availability and protection-file presence.
+- Same-origin, browser-driven HTTP protection test using a random disposable file, with safe cleanup and no database/password downloads.
+- Maintenance mode with administrator access, translated default/custom visitor messages, HTTP 503, Retry-After, no-store and noindex signals.
+- Maintenance gating for forum requests, non-authentication POST actions, avatars and logos.
+- Administrator-controlled public base URL for canonical and Open Graph URLs, including public-topic/forum pagination.
+- Public first-post descriptions, Open Graph titles/descriptions/locales/types, and custom-logo sharing images.
+- Noindex metadata for restricted, account, search, authentication and administration views; restricted post bodies are excluded from sharing metadata.
+- Password- and consent-confirmed self-service deletion for members/moderators, while preserving discussions under a shared non-login anonymous account.
+- Removal of the real account, profile, avatar, private messages, likes, reports, reset tokens and associated notifications.
+- Administrator-only activity totals and daily tables for new accounts, topics and posts, with a 30-day default and a maximum 366-day date range.
+- DST-aware Europe/Berlin date handling and SQLite datetime expression indexes for activity queries.
+- English, Polish and German translations for every new screen, status and validation message.
+- Regression and HTTP coverage for metadata visibility, canonical URL validation, maintenance bypass attempts, diagnostic probes, account deletion, and activity date boundaries.
+
+### Operational Notes
+
+- Protection-file presence and a blocked disposable probe are not a complete web-server security audit; extension-specific rules still need review.
+- The diagnostics page checks mail() availability only. No SMTP migration or automated delivery claim is introduced.
+- Account removal does not redact personal information in retained post text, quotes, third-party content or existing backups; this is disclosed before consent.
+- Activity counts reflect retained records, not traffic or an immutable history.
+- Clean-install workflow retained. No database migrations are supplied. Review canonical URL, maintenance and IP-block settings after a same-version backup restore on another host.
+
 ## ForumForgeCMS 1.4
 
 ### Added

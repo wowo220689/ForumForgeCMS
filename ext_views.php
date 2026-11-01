@@ -357,7 +357,7 @@ function forum_ext_render_topic(array $topic, array $posts, array $pagination, ?
           <article id="post-<?php echo (int) $post['id']; ?>" class="forum-post-card">
             <div class="forum-post-aside">
               <?php forum_ext_render_avatar(['id' => (int) $post['profile_user_id'], 'username' => $post['username'], 'avatar_updated_at' => $post['avatar_updated_at']], 'forum-avatar forum-post-avatar'); ?>
-              <strong><a href="<?php echo forum_url(['view' => 'user', 'id' => (int) $post['user_id']]); ?>"><?php echo forum_escape($post['username']); ?></a></strong>
+              <strong><?php if ($post['role'] === 'deleted'): ?><?php echo forum_escape(forum_t('privacy.anonymous')); ?><?php else: ?><a href="<?php echo forum_url(['view' => 'user', 'id' => (int) $post['user_id']]); ?>"><?php echo forum_escape($post['username']); ?></a><?php endif; ?></strong>
               <span><?php echo forum_escape(forum_role_label((string) ($post['role'] ?? 'member'))); ?></span>
               <small>#<?php echo (int) ($pagination['offset'] ?? 0) + $index + 1; ?></small>
               <small><?php echo (int) $post['user_post_count']; ?> <?php echo forum_escape(forum_t('postów')); ?></small>
@@ -392,7 +392,7 @@ function forum_ext_render_topic(array $topic, array $posts, array $pagination, ?
                 <?php if (forum_category_writable($topic, $currentUser) && (!(int) $topic['is_locked'] || forum_is_staff($currentUser))): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1), 'quote_post' => (int) $post['id']]); ?>#reply-body"><?php echo forum_escape(forum_t('Cytuj')); ?></a><?php endif; ?>
                 <?php if ($currentUser && (int) $currentUser['id'] !== (int) $post['user_id']): ?><form class="forum-inline-form" method="post" action="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1)]); ?>"><input type="hidden" name="action" value="report_post"><input type="hidden" name="post_id" value="<?php echo (int) $post['id']; ?>"><input type="hidden" name="csrf_token" value="<?php echo forum_escape(forum_csrf_token()); ?>"><button class="button-secondary" type="submit"><?php echo forum_escape(forum_t('Zgłoś')); ?></button></form><?php endif; ?>
                 <?php if ($currentUser && forum_ext_user_can_edit_post($currentUser, $post)): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'topic', 'id' => (int) $topic['id'], 'page' => (int) ($pagination['page'] ?? 1), 'edit_post' => (int) $post['id']]); ?>#edit-post-form"><?php echo forum_escape(forum_t('Edytuj')); ?></a><?php endif; ?>
-                <?php if ($currentUser && (int) $currentUser['id'] !== (int) $post['user_id']): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'compose', 'to' => $post['username']]); ?>"><?php echo forum_escape(forum_t('Napisz wiadomość')); ?></a><?php endif; ?>
+                <?php if ($currentUser && $post['role'] !== 'deleted' && (int) $currentUser['id'] !== (int) $post['user_id']): ?><a class="button-secondary" href="<?php echo forum_url(['view' => 'compose', 'to' => $post['username']]); ?>"><?php echo forum_escape(forum_t('Napisz wiadomość')); ?></a><?php endif; ?>
               </div>
             </div>
           </article>
@@ -454,6 +454,7 @@ function forum_ext_render_account(array $profile, array $recentTopics, array $re
       </div>
     </section>
     <?php
+    forum_privacy_render($profile);
     forum_ext_render_footer();
 }
 
@@ -723,6 +724,10 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
     $adminSections = [
         'settings' => forum_t('Widok forum i rejestracja'),
         'basic-settings' => forum_t('Ustawienia podstawowe'),
+        'hosting' => forum_t('hosting.title'),
+        'maintenance' => forum_t('maintenance.title'),
+        'seo' => forum_t('seo.title'),
+        'statistics' => forum_t('statistics.title'),
         'antispam' => forum_t('Ochrona przed spamem'),
         'backup' => forum_t('Kopia zapasowa i przywracanie forum'),
         'reports' => forum_t('Zgłoszenia postów'),
@@ -770,6 +775,9 @@ function forum_ext_render_admin_panel(array $summary, array $categories, array $
       </aside>
 
       <div class="forum-admin-content">
+        <?php if (in_array($activeSection, ['hosting', 'maintenance', 'seo', 'statistics'], true)): ?>
+          <?php forum_operations_render($activeSection); ?>
+        <?php endif; ?>
         <?php if ($activeSection === 'antispam'): ?>
           <?php forum_antispam_render_settings(); ?>
         <?php endif; ?>

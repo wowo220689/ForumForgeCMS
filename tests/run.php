@@ -164,6 +164,7 @@ foreach (['pl', 'en', 'de'] as $language) {
     check(str_contains($footer, 'id="forum-i18n"'), 'browser dictionary');
 }
 require __DIR__ . '/version-1.4.php';
+require __DIR__ . '/version-1.5.php';
 forum_ext_store_setting(forum_db(), 'forum_language', 'en');
 forum_ext_current_language();
 forum_ext_apply_language_defaults('en');

@@ -7,9 +7,12 @@ require_once __DIR__ . '/ext_permissions.php';
 require_once __DIR__ . '/ext_security.php';
 require_once __DIR__ . '/ext_notifications.php';
 require_once __DIR__ . '/ext_profile.php';
+require_once __DIR__ . '/ext_operations.php';
+require_once __DIR__ . '/ext_seo.php';
+require_once __DIR__ . '/ext_privacy.php';
 
 const FORUM_TITLE = 'ForumForgeCMS';
-const FORUM_VERSION = '1.4';
+const FORUM_VERSION = '1.5';
 const FORUM_DB_PATH = __DIR__ . '/forum-data/forum.sqlite';
 const FORUM_ADMIN_USERNAME = 'admin';
 const FORUM_ADMIN_EMAIL = '';
@@ -698,7 +701,7 @@ function forum_current_user(): ?array
     $stmt->execute([':id' => $userId]);
     $user = $stmt->fetch();
 
-    if (!$user) {
+    if (!$user || $user['role'] === 'deleted') {
         unset($_SESSION['forum_user_id']);
         return null;
     }
@@ -723,6 +726,7 @@ function forum_is_staff(?array $user): bool
 
 function forum_role_label(?string $role): string
 {
+    if ($role === 'deleted') { return forum_t('privacy.anonymous'); }
     $language = function_exists('forum_ext_current_language') ? forum_ext_current_language() : 'pl';
     $labels = [
         'pl' => [
@@ -976,7 +980,7 @@ function forum_login_user(string $login, string $password): void
 
     $guardKeys = forum_security_login_reserve($login, $user ?: null);
     $validPassword = password_verify($password, $user ? (string) $user['password_hash'] : '$2y$12$XIdtLqOxAHvCptMgN9mdGefTX68anhQkpATK1SNGTSWpW7dU/FcyK');
-    if (!$user || !$validPassword) {
+    if (!$user || !$validPassword || $user['role'] === 'deleted') {
         throw new RuntimeException(forum_t('Nie udało się zalogować. Sprawdź login i hasło.'));
     }
 
@@ -1025,7 +1029,7 @@ function forum_update_user_by_admin(int $userId, string $username, string $email
     $stmt->execute([':id' => $userId]);
     $existing = $stmt->fetch();
 
-    if (!$existing) {
+    if (!$existing || $existing['role'] === 'deleted') {
         throw new RuntimeException(forum_t('Nie znaleziono użytkownika do edycji.'));
     }
 

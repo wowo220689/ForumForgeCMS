@@ -35,7 +35,7 @@ function forum_notify_reply(PDO $pdo, int $topicId, int $postId, int $actor): vo
     $stmt = $pdo->prepare('SELECT c.* FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.id=:id');
     $stmt->execute([':id' => $topicId]);
     $category = $stmt->fetch();
-    $users = $pdo->prepare('SELECT DISTINCT u.id, u.role FROM users u WHERE u.id IN (
+    $users = $pdo->prepare('SELECT DISTINCT u.id, u.role FROM users u WHERE u.role<>"deleted" AND u.id IN (
         SELECT user_id FROM topics WHERE id=:topic UNION SELECT user_id FROM posts WHERE topic_id=:topic)');
     $users->execute([':topic' => $topicId]);
     foreach ($users->fetchAll() as $user) {

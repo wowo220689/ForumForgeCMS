@@ -4,7 +4,9 @@ ForumForgeCMS is a lightweight, self-hosted forum CMS built for classic PHP host
 
 The project focuses on practical deployment, readable moderation workflows, and a complete forum experience that can be hosted on standard web hosting packages such as Strato-style PHP hosting.
 
-Current release: **ForumForgeCMS 1.4**
+Current release: **ForumForgeCMS 1.5**
+
+[Download version 1.5](https://github.com/wowo220689/ForumForgeCMS/releases/tag/v1.5) | [Release notes](RELEASE-NOTES-1.5.md) | [Changelog](CHANGELOG.md)
 
 ## Live Demo
 
@@ -36,6 +38,11 @@ Try ForumForgeCMS online:
 - Public profiles with about-me text, location, website, and a plain-text post signature
 - Administrator backup and restore tools for the SQLite database, avatars, and custom forum logo
 - Visible ForumForgeCMS version information in the administrator panel
+- Hosting diagnostics with a safe, browser-based HTTP protection test
+- Administrator-accessible maintenance mode with HTTP 503 for visitors
+- Public-topic descriptions, Open Graph metadata, and configured canonical URLs
+- Password-confirmed self-service account deletion with anonymous discussion retention
+- Date-filtered administrator activity statistics for new accounts, topics, and posts
 - Basic SQLite performance settings and indexes for small to medium communities
 - Protective files for `forum-data` on common Apache/IIS hosting setups
 
@@ -58,6 +65,46 @@ Try ForumForgeCMS online:
 ![ForumForgeCMS admin backup and restore](screen/A3.png)
 
 ![ForumForgeCMS admin management view](screen/A4.png)
+
+## What's New in 1.5
+
+Version 1.5 adds practical site-operation tools without introducing external services, analytics providers, or a production build step. All new interface text is available in English, Polish, and German.
+
+### Hosting Diagnostics
+
+The new **Hosting diagnostics** administrator page checks PHP 8.1+, PDO SQLite, sessions, database quick integrity, foreign-key enforcement, writable data/image directories, availability of PHP `mail()`, and the presence of Apache/IIS protection files. The mail check does not send email or claim that delivery succeeds; the existing transport remains unchanged.
+
+The HTTP protection test creates a random, non-sensitive text file inside `forum-data/` and requests it from the administrator's browser on the same origin. HTTP 403/404 is reported as a blocked probe, HTTP success triggers a warning, and other outcomes are inconclusive. The test never fetches the live database or password file. Temporary probes are removed after the check; abandoned probes expire and are cleaned during subsequent checks.
+
+This is a diagnostic aid, not a complete security audit. Rules may treat extensions differently: separately verify protection of the SQLite database, generated password, and SQLite WAL/SHM files. Apache/IIS configuration files must actually be enforced. Nginx requires its own server-side deny rule. The PHP development server does not enforce `.htaccess` and will correctly trigger a warning.
+
+### Maintenance Mode
+
+Enable **Maintenance mode** from the administrator menu. Administrators retain normal access; other visitors, including signed-in moderators, receive HTTP 503 with `Retry-After: 3600`, no-store caching, and noindex directives. Avatar and logo endpoints are also gated. The sign-in page remains available so an administrator can sign back in. Only sign-in/sign-out submissions bypass the maintenance gate, not arbitrary actions sent through the login URL.
+
+Use the translated default message or enter up to 1,000 characters of plain text. Custom messages are escaped and preserved as authored, not automatically translated. Disable maintenance from the same panel when finished. Existing static assets and the site's static terms document are not access-controlled by this application-level mode.
+
+### SEO And Sharing
+
+In **SEO and sharing**, set the full public forum address, for example `https://example.com/forum`, without `index.php`. Public home, forum and topic pages then receive canonical URLs and Open Graph URLs. Canonicals preserve valid topic/forum pagination while omitting quote, edit, token and tracking parameters. The origin comes only from this administrator-controlled setting, never from an untrusted request Host header.
+
+Public topics use a plain-text excerpt of their first post. Open Graph metadata includes the forum name, localized locale, title, description, content type, and the custom logo when configured. Restricted forums and account, search, authentication, moderation and administration pages are marked noindex; restricted post text is not included in sharing metadata. Setting a URL is optional: leaving it empty omits absolute canonicals and Open Graph links. Search engines and social platforms ultimately decide how and when to display these signals.
+
+### Account Deletion
+
+Members and moderators can permanently delete their own account from **My account** after entering their current password and explicitly accepting the retention policy. The server ignores a submitted target-user ID and operates only on the signed-in account. Administrator accounts are protected from self-service deletion.
+
+Deletion removes the real user row, login/email, public profile fields, avatar, private messages involving the account, its likes, submitted reports, reset tokens and notifications. Sessions tied to the removed user can no longer authenticate. Topics and posts are transferred to a shared, non-login anonymous account (`[deleted]`) so other participants' replies remain intact. That account has no public profile and is excluded from member counts, rankings and new-account statistics.
+
+This is account removal, not automatic redaction of every mention of a person. Post text, quotes, other users' content and already-created backups can still contain personal information. The confirmation form explains this limitation before deletion; users should contact the administrator about such content first. Backup retention and removal requests remain the site operator's responsibility.
+
+### Activity Statistics
+
+The administrator-only **Activity statistics** page shows new accounts, topics and posts for an inclusive date range, with totals and a daily table. The default is the last 30 calendar days; a range may span at most 366 days. Dates use Europe/Berlin time, including daylight-saving transitions. Indexed SQLite date queries and streamed aggregation avoid loading complete content records.
+
+These are counts of currently retained database records, not visitor analytics or an immutable audit log. Deleting records changes past totals. No visitor-tracking cookies or external analytics requests are added.
+
+Version 1.5 is a clean-install release. No migration from previous database schemas is supplied. Use backups created by the same release; after restoring on another host, review **SEO and sharing**, maintenance mode and existing IP blocks before opening the forum to visitors.
 
 ## What's New in 1.4
 

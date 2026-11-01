@@ -203,7 +203,7 @@ function forum_ext_send_message(int $senderId, string $recipientLogin, string $s
         throw new RuntimeException(forum_t('Treść wiadomości jest za krótka.'));
     }
 
-    $stmt = forum_db()->prepare('SELECT id FROM users WHERE username = :login OR email = :login LIMIT 1');
+    $stmt = forum_db()->prepare('SELECT id FROM users WHERE (username = :login OR email = :login) AND role<>"deleted" LIMIT 1');
     $stmt->execute([':login' => $recipientLogin]);
     $recipient = $stmt->fetch();
     if (!$recipient) {
@@ -629,7 +629,7 @@ function forum_ext_delete_user_completely(int $targetUserId, int $adminUserId): 
         throw new RuntimeException(forum_t('Nie znaleziono użytkownika do usunięcia.'));
     }
 
-    if (strcasecmp((string) $targetUser['username'], FORUM_ADMIN_USERNAME) === 0 || (string) $targetUser['role'] === 'admin') {
+    if (strcasecmp((string) $targetUser['username'], FORUM_ADMIN_USERNAME) === 0 || in_array((string) $targetUser['role'], ['admin', 'deleted'], true)) {
         throw new RuntimeException(forum_t('Głównego konta administratora nie można usunąć z panelu.'));
     }
 

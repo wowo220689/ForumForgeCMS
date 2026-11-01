@@ -13,6 +13,12 @@ try {
     forum_ext_boot();
     forum_ext_current_language();
     forum_antispam_enforce_ip();
+    if (forum_maintenance_blocks(forum_ext_current_user(), 'avatar', 'GET')) {
+        http_response_code(503);
+        header('Retry-After: 3600');
+        header('Cache-Control: no-store');
+        exit;
+    }
     forum_ext_output_avatar_image($userId);
 } catch (Throwable $e) {
     header('Content-Type: image/svg+xml; charset=UTF-8');

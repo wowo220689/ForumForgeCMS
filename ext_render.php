@@ -100,6 +100,7 @@ function forum_ext_render_header(string $title, string $description): void
     }
     $language = forum_ext_current_language();
     $currentView = (string) ($_GET['view'] ?? 'home');
+    $seo = forum_seo_metadata($title, $description);
     ?>
 <!doctype html>
 <html lang="<?php echo forum_escape($language); ?>">
@@ -108,12 +109,13 @@ function forum_ext_render_header(string $title, string $description): void
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <meta http-equiv="Content-Language" content="<?php echo forum_escape($language); ?>">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="<?php echo forum_escape($description); ?>">
-  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <meta name="description" content="<?php echo forum_escape($seo['description']); ?>">
+  <?php forum_seo_render($seo); ?>
   <title><?php echo forum_escape($title); ?> - <?php echo forum_escape($brandName); ?></title>
   <link rel="icon" type="image/png" sizes="32x32" href="media/images/favicons/favicon-32x32.png">
   <link rel="stylesheet" href="assets/forumforgecms2026.css">
   <link rel="stylesheet" href="assets/forum.css">
+  <link rel="stylesheet" href="assets/forum-operations.css">
 </head>
 <body class="theme-<?php echo forum_escape($graphicStyle); ?>">
   <div class="site-shell">

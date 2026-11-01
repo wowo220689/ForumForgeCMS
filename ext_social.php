@@ -431,7 +431,7 @@ function forum_ext_fetch_user_profile(int $userId): ?array
                 WHERE pl.user_id = u.id
             ) AS likes_given
          FROM users u
-         WHERE u.id = :id
+         WHERE u.id = :id AND u.role<>"deleted"
          LIMIT 1'
     );
     $stmt->execute([':id' => $userId]);

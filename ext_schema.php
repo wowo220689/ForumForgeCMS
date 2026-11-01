@@ -39,6 +39,9 @@ function forum_ext_boot(): void
     forum_ext_migrate_schema(forum_db());
     forum_security_schema(forum_db());
     forum_notifications_schema(forum_db());
+    foreach (['users', 'topics', 'posts'] as $table) {
+        forum_db()->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_created_datetime ON ' . $table . '(datetime(created_at))');
+    }
     $booted = true;
 }
 
@@ -210,6 +213,9 @@ function forum_ext_default_settings(): array
         'antispam_domains' => '',
         'antispam_usernames' => '',
         'antispam_ips' => '',
+        'maintenance_enabled' => '0',
+        'maintenance_message' => '',
+        'site_url' => '',
     ];
 }
 
@@ -425,7 +431,7 @@ function forum_ext_admin_summary(): array
     $pdo = forum_db();
 
     return [
-        'users' => (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(),
+        'users' => (int) $pdo->query('SELECT COUNT(*) FROM users WHERE role<>"deleted"')->fetchColumn(),
         'categories' => (int) $pdo->query('SELECT COUNT(*) FROM categories c WHERE ' . forum_visibility_sql('c'))->fetchColumn(),
         'topics' => (int) $pdo->query('SELECT COUNT(*) FROM topics t WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
         'posts' => (int) $pdo->query('SELECT COUNT(*) FROM posts p JOIN topics t ON t.id=p.topic_id WHERE ' . forum_visible_topic_sql('t'))->fetchColumn(),
@@ -460,6 +466,7 @@ function forum_ext_top_users(int $limit = 8): array
                 WHERE p2.user_id = u.id AND p2.topic_id IN (SELECT vt.id FROM topics vt WHERE ' . forum_visible_topic_sql('vt') . ')
             ) AS likes_received
          FROM users u
+         WHERE u.role<>"deleted"
          ORDER BY post_count DESC, topic_count DESC, likes_received DESC, u.username ASC
          LIMIT :limit'
     );
@@ -471,7 +478,7 @@ function forum_ext_top_users(int $limit = 8): array
 
 function forum_ext_count_users(): int
 {
-    return (int) forum_db()->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    return (int) forum_db()->query('SELECT COUNT(*) FROM users WHERE role<>"deleted"')->fetchColumn();
 }
 
 function forum_ext_admin_users_sql(): string
@@ -518,7 +525,7 @@ function forum_ext_admin_users_sql(): string
 
 function forum_ext_admin_users(int $limit = 200, int $offset = 0): array
 {
-    $sql = forum_ext_admin_users_sql() . '
+    $sql = forum_ext_admin_users_sql() . ' WHERE u.role<>"deleted"
      ORDER BY
         CASE u.role
             WHEN "admin" THEN 0
@@ -541,7 +548,7 @@ function forum_ext_admin_users(int $limit = 200, int $offset = 0): array
 
 function forum_ext_admin_user(int $userId): ?array
 {
-    $stmt = forum_db()->prepare(forum_ext_admin_users_sql() . ' WHERE u.id = :id LIMIT 1');
+    $stmt = forum_db()->prepare(forum_ext_admin_users_sql() . ' WHERE u.id = :id AND u.role<>"deleted" LIMIT 1');
     $stmt->execute([':id' => $userId]);
     $user = $stmt->fetch();
 

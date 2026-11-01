@@ -37,12 +37,44 @@ $view = (string) ($_GET['view'] ?? 'home');
 $adminSection = (string) ($_GET['section'] ?? 'settings');
 $adminUserId = (int) ($_GET['user_id'] ?? 0);
 
+if (forum_maintenance_blocks($currentUser, $view, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'), (string) ($_POST['action'] ?? ''))) {
+    forum_maintenance_render();
+    exit;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     try {
         forum_require_valid_csrf();
         $action = (string) ($_POST['action'] ?? '');
 
         switch ($action) {
+            case 'update_operations':
+                $section = (string) ($_POST['operations_section'] ?? '');
+                forum_operations_save($section, $_POST);
+                forum_flash('success', forum_t('Ustawienia forum zostały zapisane.'));
+                forum_redirect(forum_url(['view' => 'admin', 'section' => $section]));
+
+            case 'hosting_probe':
+            case 'hosting_probe_cleanup':
+                forum_require_admin_user();
+                header('Content-Type: application/json; charset=utf-8');
+                header('Cache-Control: no-store');
+                if ($action === 'hosting_probe_cleanup') {
+                    forum_hosting_probe_cleanup();
+                    echo '{}';
+                } else {
+                    forum_rate_limit('hosting_probe', 10, 600);
+                    echo json_encode(forum_hosting_probe(), JSON_THROW_ON_ERROR);
+                }
+                exit;
+
+            case 'delete_own_account':
+                $user = forum_require_login();
+                forum_rate_limit('delete_account_' . (int) $user['id'], 5, 900);
+                forum_delete_own_account((int) $user['id'], (string) ($_POST['current_password'] ?? ''), (string) ($_POST['confirm_deletion'] ?? '') === '1');
+                forum_flash('success', forum_t('privacy.done'));
+                forum_redirect(forum_url(['view' => 'login']));
+
             case 'register':
                 forum_rate_limit('register', 3, 900);
                 if (!forum_ext_registrations_enabled()) {
